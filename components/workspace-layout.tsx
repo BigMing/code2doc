@@ -21,18 +21,18 @@ export function WorkspaceLayout() {
             <div className="w-8 h-8 bg-[#3B82F6] rounded flex items-center justify-center">
               <span className="text-white text-xs font-black">C2D</span>
             </div>
-            <h1 className="text-lg font-extrabold text-slate-800 tracking-tight">Code2Doc 代码需求文档建议器</h1>
+            <h1 className="text-lg font-extrabold text-slate-800 tracking-tight">Code2Doc — 代码需求文档智能生成器</h1>
           </div>
           <div className="h-4 w-px bg-slate-200" />
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            工作区已就绪
+            系统就绪
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:block">
-            Gemini 3.1 Flash Preview
+            Gemini 3 Flash Preview (Pro)
           </div>
         </div>
       </header>
@@ -61,7 +61,7 @@ export function WorkspaceLayout() {
               {result ? (
                 <DocPanel content={result.requirementDoc} />
               ) : (
-                <EmptyState icon={<FileCode className="w-10 h-10 text-slate-200" />} title="需求文档预览" description="在左侧输入代码并生成后，此处将展示还原的需求说明文档" />
+                <EmptyState icon={<FileCode className="w-10 h-10 text-slate-100" />} title="需求文档预览" description="在左侧输入代码并点击“生成需求文档”，分析结果将在此呈现" />
               )}
             </div>
           </Panel>
@@ -70,11 +70,11 @@ export function WorkspaceLayout() {
 
           {/* 右侧：补全代码 */}
           <Panel defaultSize={37.5} minSize={20}>
-            <div className="h-full bg-[#1e1e1e] transition-opacity">
+            <div className="h-full bg-slate-50/20 transition-opacity">
               {result ? (
                 <CodePanel code={result.annotatedCode} language={config.language} />
               ) : (
-                <EmptyState icon={<CheckCircle2 className="w-10 h-10 text-slate-700/50" />} title="注释补全预览" description="AI 补全后的代码及规范化注释将在此实时对比展示" dark />
+                <EmptyState icon={<CheckCircle2 className="w-10 h-10 text-slate-100" />} title="代码补全分析" description="AI 补全后的代码及规范化注释将在此对比展示" />
               )}
             </div>
           </Panel>
@@ -82,17 +82,17 @@ export function WorkspaceLayout() {
       </div>
 
       {/* Status Bar */}
-      <footer className="h-7 bg-[#1E293B] text-white/50 text-[10px] font-bold uppercase tracking-widest px-4 flex items-center gap-6 shrink-0 z-20">
+      <footer className="h-7 bg-white border-t border-slate-200 text-slate-400 text-[10px] font-bold uppercase tracking-widest px-4 flex items-center gap-6 shrink-0 z-20">
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>系统在线</span>
         </div>
-        <div className="h-3 w-px bg-white/10" />
-        <div>引擎: <span className="text-white/80">Gemini 3.1 Flash</span></div>
-        <div className="h-3 w-px bg-white/10" />
+        <div className="h-3 w-px bg-slate-200" />
+        <div>引擎: <span className="text-slate-600">Gemini 3 Flash Preview</span></div>
+        <div className="h-3 w-px bg-slate-200" />
         <div className="ml-auto flex items-center gap-4">
-          <span className="text-white/30">UTF-8</span>
-          <span className="bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded leading-none">就绪</span>
+          <span className="text-slate-300">UTF-8</span>
+          <span className="bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded leading-none border border-blue-100">就绪</span>
         </div>
       </footer>
     </div>

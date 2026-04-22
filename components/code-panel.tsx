@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 
@@ -23,24 +23,24 @@ export function CodePanel({ code, language, title = "补全注释代码 (Annotat
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#1e1e1e] overflow-hidden border-r border-white/5 last:border-r-0">
-      <div className="h-10 bg-[#252526] border-b border-white/5 flex items-center justify-between px-4 shrink-0">
-        <h2 className="text-[11px] font-bold text-white/50 uppercase tracking-wider">{title}</h2>
+    <div className="flex flex-col h-full bg-white overflow-hidden border-r border-slate-200 last:border-r-0">
+      <div className="h-10 bg-slate-50 border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
+        <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{title}</h2>
         <div className="flex items-center gap-3">
-          <span className="px-2 py-0.5 rounded bg-green-500/10 text-green-400 text-[10px] font-bold uppercase tracking-tight">AI 增强补全</span>
+          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-tight">AI 增强补全</span>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40 hover:text-white/80 transition-colors"
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors"
           >
-            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             {copied ? '已复制' : '复制代码'}
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto custom-scrollbar">
+      <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50/30">
         <SyntaxHighlighter
           language={language.toLowerCase()}
-          style={vscDarkPlus}
+          style={vs}
           showLineNumbers={showLineNumbers}
           customStyle={{
             margin: 0,

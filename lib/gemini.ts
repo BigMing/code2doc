@@ -2,11 +2,38 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, AnalysisConfig } from "./types";
 import { SYSTEM_PROMPT, getAnalysisPrompt } from "./prompt-template";
 
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+
+const ai = new GoogleGenAI({
+  apiKey: API_KEY,
+});
 
 // [第二轮修改] 优先使用 gemini-3-flash-preview
 const PRIMARY_MODEL = "gemini-3-flash-preview";
 const FALLBACK_MODEL = "gemini-2.5-flash";
+
+export async function detectLanguage(code: string): Promise<string> {
+  if (!API_KEY) return 'java';
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: PRIMARY_MODEL,
+      contents: `Identify the programming language of the following code snippet. Return ONLY the name of the language (e.g., "javascript", "python", "java", etc.). If unsure, return "java".\n\nCode:\n${code.substring(0, 500)}`,
+      config: {
+        maxOutputTokens: 10,
+        temperature: 0.1,
+      }
+    });
+
+    const text = response.text?.trim().toLowerCase() || "java";
+    // 匹配主流语言，如果不在列表中则返回默认
+    const supported = ['java', 'python', 'javascript', 'typescript', 'go', 'cpp', 'csharp', 'ruby', 'rust', 'php', 'swift', 'kotlin', 'sql', 'html', 'css'];
+    return supported.includes(text) ? text : 'java';
+  } catch (error) {
+    console.error("Language Detection Error:", error);
+    return 'java';
+  }
+}
 
 export async function analyzeCode(
   code: string, 
@@ -17,15 +44,14 @@ export async function analyzeCode(
     throw new Error("API Key 未配置");
   }
 
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
   const prompt = getAnalysisPrompt(code, config);
   
   // 记录请求体信息（用于调试日志）
   const requestParams = {
     model: PRIMARY_MODEL,
-    contents: prompt,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
-      systemInstruction: SYSTEM_PROMPT,
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
       responseMimeType: "application/json",
     }
   };
@@ -33,9 +59,9 @@ export async function analyzeCode(
   const callModel = async (modelName: string) => {
     return await ai.models.generateContent({
       model: modelName,
-      contents: prompt,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -51,24 +77,21 @@ export async function analyzeCode(
   };
 
   try {
-    let response;
+    let result;
     try {
-      response = await callModel(PRIMARY_MODEL);
+      result = await callModel(PRIMARY_MODEL);
     } catch (e: any) {
-      console.warn("Primary model failed, checking for 404/Not Found to fallback:", e);
-      if (e.message?.includes("not found") || e.message?.includes("404")) {
-        response = await callModel(FALLBACK_MODEL);
-      } else {
-        throw e;
-      }
+      console.warn("Primary model failed, checking for fallback:", e);
+      // Fallback logic
+      result = await callModel(FALLBACK_MODEL);
     }
 
     if (updateRawInfo) {
-      // 获取响应原始内容
-      updateRawInfo(requestParams, response);
+      // 记录原始请求和完整响应体（供日志面板展示）
+      updateRawInfo(requestParams, result);
     }
 
-    const resultText = response.text;
+    const resultText = result.text;
     if (!resultText) {
       throw new Error("AI 未返回有效内容");
     }

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAppContext } from '@/lib/context';
-import { analyzeCode } from '@/lib/gemini';
+import { analyzeCode, detectLanguage } from '@/lib/gemini';
 import { AiParseSummary } from '@/lib/types';
 import { 
   FileCode, 
@@ -12,17 +12,22 @@ import {
   FileText, 
   Wand2, 
   RotateCw,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const LANGUAGES = [
+  { value: 'auto', label: '自动识别 (AI)' },
   { value: 'java', label: 'Java' },
   { value: 'python', label: 'Python' },
   { value: 'javascript', label: 'JavaScript' },
   { value: 'typescript', label: 'TypeScript' },
   { value: 'go', label: 'Go' },
   { value: 'cpp', label: 'C++' },
+  { value: 'csharp', label: 'C#' },
+  { value: 'ruby', label: 'Ruby' },
+  { value: 'rust', label: 'Rust' },
 ];
 
 export function InputPanel() {
@@ -37,6 +42,17 @@ export function InputPanel() {
 
   const [expanded, setExpanded] = useState({ context: false, old: false });
   const [error, setError] = useState<string | null>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
+
+  // 自动识别语言
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (rawCode && rawCode.length > 20 && config.language === 'auto') {
+        handleDetectLanguage(rawCode);
+      }
+    }, 1000); // 防抖
+    return () => clearTimeout(timer);
+  }, [rawCode, config.language]);
 
   const calculateSummary = (annotated: string, doc: string, raw: string): AiParseSummary => {
     const codeLines = raw.split('\n').length;
@@ -53,22 +69,49 @@ export function InputPanel() {
     return { methodCount, classCount, docSections, detectedRules, codeLines };
   };
 
+  const handleDetectLanguage = async (code: string) => {
+    if (!code || code.length < 20 || config.language !== 'auto') return;
+    
+    setIsDetecting(true);
+    try {
+      const language = await detectLanguage(code);
+      if (language) {
+        setConfig({ ...config, language });
+        addLog(`自动识别语言：${language}`, 'info');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!rawCode || rawCode.length < 50) {
       setError('请输入至少 50 个字符的代码以供分析。');
       addLog('分析中段：代码长度不足 50 字符', 'warning');
       return;
     }
+
+    let finalLanguage = config.language;
+    if (finalLanguage === 'auto') {
+      setIsDetecting(true);
+      addLog('正在自动识别编程语言...', 'info');
+      finalLanguage = await detectLanguage(rawCode);
+      setConfig({ ...config, language: finalLanguage });
+      setIsDetecting(false);
+    }
+
     setError(null);
     setIsAnalyzing(true);
-    addLog(`开始分析代码，目标语言：${config.language}`, 'info');
+    addLog(`开始分析代码，目标语言：${finalLanguage}`, 'info');
 
     try {
       addLog(`Prompt 组装完成，代码长度：${rawCode.length} 字符`, 'info');
       addLog('正在调用 Gemini 模型...', 'info');
       
       const startTime = Date.now();
-      const gResult = await analyzeCode(rawCode, config, (req, res) => {
+      const gResult = await analyzeCode(rawCode, { ...config, language: finalLanguage }, (req, res) => {
         setRawRequest(req);
         setRawResponse(res);
       });
@@ -96,13 +139,16 @@ export function InputPanel() {
           <FileCode className="w-3.5 h-3.5" />
           原始代码 (Source)
         </h2>
-        <select
-          value={config.language}
-          onChange={(e) => setConfig({ ...config, language: e.target.value })}
-          className="bg-transparent border-none text-[10px] font-bold text-blue-600 outline-none cursor-pointer uppercase tracking-tight"
-        >
-          {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          {isDetecting && <Sparkles className="w-3 h-3 text-blue-500 animate-pulse" />}
+          <select
+            value={config.language}
+            onChange={(e) => setConfig({ ...config, language: e.target.value })}
+            className="bg-transparent border-none text-[10px] font-bold text-blue-600 outline-none cursor-pointer uppercase tracking-tight"
+          >
+            {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4 custom-scrollbar">
