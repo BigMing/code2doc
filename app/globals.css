@@ -1,0 +1,90 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@layer base {
+  :root {
+    --font-sans: var(--font-inter);
+    --font-mono: var(--font-jetbrains-mono);
+    
+    --bg: #F8FAFC;
+    --sidebar: #1E293B;
+    --border: #E2E8F0;
+    --accent: #3B82F6;
+    --text-main: #334155;
+    --text-muted: #64748B;
+    --code-bg: #1E1E1E;
+    --comment-green: #10B981;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-main);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Dark mode scrollbar */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3f3f3f;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4f4f4f;
+}
+
+/* Code Highlighting Customizations */
+.token.comment, .token.prolog, .token.doctype, .token.cdata {
+  color: #6a9955 !important;
+  font-style: italic;
+}
+
+/* User requested custom style for added comments */
+.token.comment.added {
+  color: var(--comment-green) !important;
+  font-weight: 500 !important;
+}
+
+/* Markdown prose overrides */
+.prose h1 {
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 0.5rem;
+  margin-top: 2rem;
+}
+
+.prose h2 {
+  font-weight: 700;
+  color: #1e293b;
+  margin-top: 1.5rem;
+}
+
+.prose code {
+  background-color: #f1f5f9;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.prose code::before, .prose code::after {
+  content: "";
+}

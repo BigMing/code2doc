@@ -1,0 +1,5 @@
+{
+  "name": "Code2Doc — 代码需求文档智能生成器",
+  "description": "代码即文档 — 将工程代码自动翻译为标准需求文档，并智能补全规范注释。支持三栏分屏工作区与分析全链路日志展示。",
+  "requestFramePermissions": []
+}
