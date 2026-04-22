@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { AnalysisResult, AnalysisConfig, LogEntry, LogType, AiParseSummary } from '@/lib/types';
+import { HistoryItem } from '@/lib/storage';
+import { calculateSummary } from '@/lib/summary';
 
 interface AppState {
   rawCode: string;
@@ -22,6 +24,8 @@ interface AppState {
   setRawRequest: (req: object | null) => void;
   setRawResponse: (res: object | null) => void;
   clearLogs: () => void;
+  loadHistoryItem: (item: HistoryItem) => void;
+  clearRawData: () => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -48,6 +52,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const clearLogs = useCallback(() => setLogs([]), []);
 
+  const clearRawData = useCallback(() => {
+    setRawRequest(null);
+    setRawResponse(null);
+  }, []);
+
+  const loadHistoryItem = useCallback((item: HistoryItem) => {
+    setRawCode(item.originalCode);
+    setConfig({
+      language: item.language,
+      businessBackground: item.businessContext,
+      oldRequirements: item.oldRequirement,
+    });
+    setResult(item.result);
+    
+    // [修复] 加载历史时重新计算统计摘要
+    const summary = calculateSummary(
+      item.result.annotatedCode, 
+      item.result.requirementDoc, 
+      item.originalCode
+    );
+    setParseSummary(summary);
+
+    // 历史记录不包含原始 API 报文，清空它们
+    clearRawData();
+    addLog(`已加载历史记录：${item.title}`, 'info');
+  }, [addLog, clearRawData]);
+
   return (
     <AppContext.Provider value={{ 
       rawCode, setRawCode, 
@@ -57,7 +88,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       logs, addLog, clearLogs,
       parseSummary, setParseSummary,
       rawRequest, setRawRequest,
-      rawResponse, setRawResponse
+      rawResponse, setRawResponse,
+      loadHistoryItem,
+      clearRawData
     }}>
       {children}
     </AppContext.Provider>

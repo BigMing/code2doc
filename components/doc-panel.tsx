@@ -4,13 +4,30 @@ import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
-import { List } from 'lucide-react';
+import { List, Download } from 'lucide-react';
+import { useAppContext } from '@/lib/context';
+import { downloadMarkdown, wrapMarkdown } from '@/lib/file-download';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface DocPanelProps {
   content: string;
 }
 
 export function DocPanel({ content }: DocPanelProps) {
+  const { config, addLog } = useAppContext();
+
+  // [第三轮新增] 导出文档
+  const handleExport = () => {
+    const wrapped = wrapMarkdown(content, config.language);
+    const dateStr = new Date().toLocaleDateString('zh-CN').replace(/\//g, '');
+    const filename = `需求文档_${dateStr}.md`;
+    
+    downloadMarkdown(filename, wrapped);
+    toast.success('文档下载已开始');
+    addLog(`已导出需求文档：${filename}`, 'success');
+  };
+
   // [第二轮新增] 提取标题生成目录
   const toc = useMemo(() => {
     const lines = content.split('\n');
@@ -29,8 +46,18 @@ export function DocPanel({ content }: DocPanelProps) {
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200 relative group">
       <div className="h-10 bg-slate-100 border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
-        <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">需求文档 (RECOVERY)</h2>
-        {toc.length > 0 && (
+        <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">需求文档</h2>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 px-2 text-[10px] font-bold uppercase gap-1.5 border-slate-200 hover:bg-slate-50"
+            onClick={handleExport}
+          >
+            <Download className="w-3.5 h-3.5" />
+            导出文档
+          </Button>
+          {toc.length > 0 && (
           <div className="relative group/toc">
             <button className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-blue-600 transition-colors">
               <List className="w-3 h-3" />
@@ -53,6 +80,7 @@ export function DocPanel({ content }: DocPanelProps) {
           </div>
         )}
       </div>
+    </div>
 
       <div className="flex-1 overflow-auto p-12 scroll-smooth custom-scrollbar relative">
         <div className="prose prose-slate max-w-none prose-headings:scroll-mt-20 prose-h1:text-3xl prose-h1:font-black prose-h1:text-slate-800 prose-h1:mb-8 prose-h2:text-xl prose-h2:font-bold prose-h2:border-b-2 prose-h2:border-slate-100 prose-h2:pb-3 prose-h2:mt-12 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-8">

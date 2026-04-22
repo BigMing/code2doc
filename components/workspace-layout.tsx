@@ -6,8 +6,9 @@ import { LogPanel } from './log-panel';
 import { InputPanel } from './input-panel';
 import { DocPanel } from './doc-panel';
 import { CodePanel } from './code-panel';
+import { TopActionBar } from './top-action-bar';
 import { useAppContext } from '@/lib/context';
-import { Terminal, FileCode, CheckCircle2 } from 'lucide-react';
+import { Terminal, FileCode, CheckCircle2, Sparkles } from 'lucide-react';
 
 export function WorkspaceLayout() {
   const { result, config } = useAppContext();
@@ -31,11 +32,17 @@ export function WorkspaceLayout() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:block">
-            Gemini 3 Flash Preview (Pro)
+          <div className="px-2 py-1 rounded bg-slate-50 border border-slate-100 flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              Gemini 3 Flash Pro
+            </span>
           </div>
         </div>
       </header>
+
+      {/* [第三轮新增] 全局操作栏 */}
+      <TopActionBar />
 
       {/* Dynamic Panels */}
       <div className="flex-1 overflow-hidden">

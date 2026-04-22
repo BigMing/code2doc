@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '@/lib/context';
 import { analyzeCode, detectLanguage } from '@/lib/gemini';
 import { AiParseSummary } from '@/lib/types';
+import { calculateSummary } from '@/lib/summary';
 import { 
   FileCode, 
   ChevronDown, 
@@ -53,21 +54,6 @@ export function InputPanel() {
     }, 1000); // 防抖
     return () => clearTimeout(timer);
   }, [rawCode, config.language]);
-
-  const calculateSummary = (annotated: string, doc: string, raw: string): AiParseSummary => {
-    const codeLines = raw.split('\n').length;
-    // 匹配 (public|private|protected|def|function)\s+\w+
-    const methodCount = (annotated.match(/(public|private|protected|def|function)\s+\w+/g) || []).length;
-    // 匹配 (class|interface|struct)\s+\w+
-    const classCount = (annotated.match(/(class|interface|struct)\s+\w+/g) || []).length;
-    // 匹配 ## 或 ###
-    const docSections = (doc.match(/^#{2,3}\s+/gm) || []).length;
-    // 匹配业务关键词
-    const ruleKeywords = /业务规则|校验规则|约束|限制|必须|禁止|罚息|费率/g;
-    const detectedRules = (doc.match(ruleKeywords) || []).length;
-
-    return { methodCount, classCount, docSections, detectedRules, codeLines };
-  };
 
   const handleDetectLanguage = async (code: string) => {
     if (!code || code.length < 20 || config.language !== 'auto') return;
