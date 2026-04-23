@@ -66,7 +66,7 @@ export function CodePanel({ code, language, title = "补全注释代码", showLi
             className="h-7 px-2 text-[10px] font-bold uppercase gap-1.5 border-slate-200 disabled:opacity-40"
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-            {copied ? '已复制' : '📋 复制代码'}
+            {copied ? '已复制' : '复制代码'}
           </Button>
         </div>
       </div>

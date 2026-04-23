@@ -104,7 +104,7 @@ export function TopActionBar() {
           onClick={() => window.location.reload()} // 简单的重置方案
         >
           <RotateCw className="w-3.5 h-3.5" />
-          🔄 重新分析
+          重新分析
         </Button>
       </div>
     </div>
