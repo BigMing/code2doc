@@ -79,6 +79,12 @@ export function ModelConfigDialog() {
 
   const hasKey = !!modelConfig.apiKey;
 
+  // [修复] 避免 SSR/CSR 不一致导致的 hydration mismatch
+  // localStorage 中的配置在 SSR 时无法读取，导致 hasKey 在服务端和客户端可能不同
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const displayHasKey = mounted ? hasKey : false;
+
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger
@@ -87,12 +93,12 @@ export function ModelConfigDialog() {
             variant="ghost"
             size="sm"
             className={`h-8 text-[11px] font-bold uppercase tracking-wider gap-1.5 ${
-              hasKey
+              displayHasKey
                 ? 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
                 : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
             }`}
           >
-            {hasKey ? (
+            {displayHasKey ? (
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
             ) : (
               <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
@@ -208,8 +214,8 @@ export function ModelConfigDialog() {
             </div>
             <div className="flex items-center gap-2 text-[11px]">
               <span className="text-slate-400">Key:</span>
-              <span className={hasKey ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
-                {hasKey ? '已配置' : '未配置'}
+              <span className={displayHasKey ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
+                {displayHasKey ? '已配置' : '未配置'}
               </span>
             </div>
             {modelConfig.baseUrl && (
