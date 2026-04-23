@@ -40,12 +40,12 @@ export function HistoryPopover() {
   const [open, setOpen] = useState(false);
   const { loadHistoryItem, addLog } = useAppContext();
 
-  // 每次打开面板时重新加载数据
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (newOpen) {
       setItems(loadFromStorage());
     }
-  }, [open]);
+  };
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,7 +61,7 @@ export function HistoryPopover() {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger 
         render={
           <Button variant="outline" size="sm" className="h-8 gap-1.5 border-slate-200">

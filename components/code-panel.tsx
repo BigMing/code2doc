@@ -3,12 +3,14 @@
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { Copy, Check, Sparkles, FileCode } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { toast } from 'sonner';
 import { useAppContext } from '@/lib/context';
 import { Button } from '@/components/ui/button';
+import { useTypewriter } from '@/hooks/use-typewriter';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface CodePanelProps {
   code: string;
@@ -19,10 +21,24 @@ interface CodePanelProps {
 
 export function CodePanel({ code, language, title = "补全注释代码", showLineNumbers = true }: CodePanelProps) {
   const [copied, setCopied] = useState(false);
-  const { addLog } = useAppContext();
+  const { addLog, isStreaming, isTypewriting, fullCodeText, setTypewriting } = useAppContext();
+
+  // 使用打字机 Hook (较文档稍快一些)
+  const { displayText, isComplete } = useTypewriter(fullCodeText, isTypewriting, 5);
+
+  // 当打字机完成时，通知 Context
+  React.useEffect(() => {
+    if (isTypewriting && isComplete) {
+      setTypewriting(false);
+      addLog('注释代码渲染完成', 'success');
+    }
+  }, [isTypewriting, isComplete, setTypewriting, addLog]);
+
+  // 显示内容逻辑
+  const displayCode = isTypewriting ? displayText : code;
 
   const handleCopy = async () => {
-    const success = await copyToClipboard(code);
+    const success = await copyToClipboard(displayCode);
     if (success) {
       setCopied(true);
       toast.success('代码已复制到剪贴板');
@@ -46,7 +62,8 @@ export function CodePanel({ code, language, title = "补全注释代码", showLi
             variant="outline"
             size="sm"
             onClick={handleCopy}
-            className="h-7 px-2 text-[10px] font-bold uppercase gap-1.5 border-slate-200"
+            disabled={!displayCode || isStreaming || isTypewriting}
+            className="h-7 px-2 text-[10px] font-bold uppercase gap-1.5 border-slate-200 disabled:opacity-40"
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             {copied ? '已复制' : '📋 复制代码'}
@@ -54,25 +71,52 @@ export function CodePanel({ code, language, title = "补全注释代码", showLi
         </div>
       </div>
       <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50/30">
-        <SyntaxHighlighter
-          language={language.toLowerCase()}
-          style={vs}
-          showLineNumbers={showLineNumbers}
-          customStyle={{
-            margin: 0,
-            padding: '1.5rem',
-            fontSize: '13px',
-            lineHeight: '1.6',
-            backgroundColor: 'transparent',
-          }}
-          codeTagProps={{
-            style: {
-              fontFamily: 'var(--font-mono)',
-            }
-          }}
-        >
-          {code}
-        </SyntaxHighlighter>
+        {isStreaming && !displayCode && (
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-4 w-1/3 bg-slate-100" />
+            <Skeleton className="h-4 w-2/3 bg-slate-100" />
+            <Skeleton className="h-4 w-1/2 bg-slate-100" />
+            <Skeleton className="h-4 w-3/4 bg-slate-100" />
+            <Skeleton className="h-4 w-1/4 bg-slate-100" />
+            <p className="text-[10px] text-slate-400 italic text-center animate-pulse pt-10">正在准备增强代码输出...</p>
+          </div>
+        )}
+
+        {(displayCode || (!isStreaming && code)) && (
+          <div className="relative">
+            <SyntaxHighlighter
+              language={language.toLowerCase()}
+              style={vs}
+              showLineNumbers={showLineNumbers}
+              customStyle={{
+                margin: 0,
+                padding: '1.5rem',
+                fontSize: '13px',
+                lineHeight: '1.6',
+                backgroundColor: 'transparent',
+              }}
+              codeTagProps={{
+                style: {
+                  fontFamily: 'var(--font-mono)',
+                }
+              }}
+            >
+              {displayCode}
+            </SyntaxHighlighter>
+            {isTypewriting && (
+              <div className="absolute bottom-4 left-6 text-blue-500 font-mono text-sm animate-pulse">▋</div>
+            )}
+          </div>
+        )}
+
+        {!isStreaming && !code && !isTypewriting && (
+          <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
+             <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
+                <FileCode className="w-8 h-8 text-slate-200" />
+             </div>
+             <p className="text-xs font-medium">尚未生成增强代码</p>
+          </div>
+        )}
       </div>
     </div>
   );

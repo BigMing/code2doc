@@ -14,6 +14,15 @@ interface AppState {
   parseSummary: AiParseSummary | null;
   rawRequest: object | null;
   rawResponse: object | null;
+
+  // [第四轮新增] 流式与打字机状态
+  isStreaming: boolean;
+  charsReceived: number;
+  accumulatedRawText: string;
+  isTypewriting: boolean;
+  fullDocText: string;
+  fullCodeText: string;
+  showSkipButton: boolean;
   
   setRawCode: (code: string) => void;
   setConfig: (config: AnalysisConfig) => void;
@@ -26,6 +35,14 @@ interface AppState {
   clearLogs: () => void;
   loadHistoryItem: (item: HistoryItem) => void;
   clearRawData: () => void;
+
+  // [第四轮新增] 流式调度方法
+  streamStart: () => void;
+  streamChunk: (chunk: string, accumulated: string) => void;
+  streamEnd: (result: AnalysisResult) => void;
+  setTypewriting: (active: boolean) => void;
+  skipAnimation: () => void;
+  resetStreamState: () => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -44,10 +61,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [rawRequest, setRawRequest] = useState<object | null>(null);
   const [rawResponse, setRawResponse] = useState<object | null>(null);
 
+  // [第四轮新增] 流式与打字机状态组件内部实现
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [charsReceived, setCharsReceived] = useState(0);
+  const [accumulatedRawText, setAccumulatedRawText] = useState('');
+  const [isTypewriting, setIsTypewriting] = useState(false);
+  const [fullDocText, setFullDocText] = useState('');
+  const [fullCodeText, setFullCodeText] = useState('');
+  const [showSkipButton, setShowSkipButton] = useState(false);
+
   const addLog = useCallback((message: string, type: LogType = 'info') => {
     const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
     const id = Math.random().toString(36).substring(2, 9);
     setLogs(prev => [...prev.slice(-49), { id, timestamp, type, message }]);
+  }, []);
+
+  const resetStreamState = useCallback(() => {
+    setIsStreaming(false);
+    setCharsReceived(0);
+    setAccumulatedRawText('');
+    setIsTypewriting(false);
+    setFullDocText('');
+    setFullCodeText('');
+    setShowSkipButton(false);
+    setResult(null);
+    setParseSummary(null);
+  }, []);
+
+  const streamStart = useCallback(() => {
+    resetStreamState();
+    setIsStreaming(true);
+    setIsAnalyzing(true);
+  }, [resetStreamState]);
+
+  const streamChunk = useCallback((chunk: string, accumulated: string) => {
+    setAccumulatedRawText(accumulated);
+    setCharsReceived(accumulated.length);
+  }, []);
+
+  const streamEnd = useCallback((res: AnalysisResult) => {
+    setIsStreaming(false);
+    setFullDocText(res.requirementDoc);
+    setFullCodeText(res.annotatedCode);
+    setResult(res);
+    setIsTypewriting(true);
+    setShowSkipButton(true);
+  }, []);
+
+  const setTypewriting = useCallback((active: boolean) => {
+    setIsTypewriting(active);
+    if (!active) setShowSkipButton(false);
+  }, []);
+
+  const skipAnimation = useCallback(() => {
+    setIsTypewriting(false);
+    setShowSkipButton(false);
   }, []);
 
   const clearLogs = useCallback(() => setLogs([]), []);
@@ -90,7 +158,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       rawRequest, setRawRequest,
       rawResponse, setRawResponse,
       loadHistoryItem,
-      clearRawData
+      clearRawData,
+      // [第四轮新增] 流式状态导出
+      isStreaming,
+      charsReceived,
+      accumulatedRawText,
+      isTypewriting,
+      fullDocText,
+      fullCodeText,
+      showSkipButton,
+      streamStart,
+      streamChunk,
+      streamEnd,
+      setTypewriting,
+      skipAnimation,
+      resetStreamState
     }}>
       {children}
     </AppContext.Provider>

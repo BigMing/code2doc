@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import { useAppContext } from '@/lib/context';
-import { analyzeCode, detectLanguage } from '@/lib/gemini';
+import { streamAnalyzeCode, detectLanguage } from '@/lib/gemini';
 import { AiParseSummary } from '@/lib/types';
 import { calculateSummary } from '@/lib/summary';
+import { extractJsonFromStream } from '@/lib/stream-parser';
 import { 
   FileCode, 
   ChevronDown, 
@@ -38,24 +39,17 @@ export function InputPanel() {
     setResult, 
     isAnalyzing, setIsAnalyzing,
     addLog, setParseSummary,
-    setRawRequest, setRawResponse
+    setRawRequest, setRawResponse,
+    // [第四轮新增] 流式调度方法
+    streamStart, streamChunk, streamEnd, resetStreamState
   } = useAppContext();
 
   const [expanded, setExpanded] = useState({ context: false, old: false });
   const [error, setError] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
-  // 自动识别语言
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      if (rawCode && rawCode.length > 20 && config.language === 'auto') {
-        handleDetectLanguage(rawCode);
-      }
-    }, 1000); // 防抖
-    return () => clearTimeout(timer);
-  }, [rawCode, config.language]);
-
-  const handleDetectLanguage = async (code: string) => {
+  const handleDetectLanguage = React.useCallback(async (code: string) => {
     if (!code || code.length < 20 || config.language !== 'auto') return;
     
     setIsDetecting(true);
@@ -70,14 +64,30 @@ export function InputPanel() {
     } finally {
       setIsDetecting(false);
     }
-  };
+  }, [config, addLog, setConfig]);
+
+  // 自动识别语言
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (rawCode && rawCode.length > 20 && config.language === 'auto') {
+        handleDetectLanguage(rawCode);
+      }
+    }, 1000); // 防抖
+    return () => clearTimeout(timer);
+  }, [rawCode, config.language, handleDetectLanguage]);
 
   const handleGenerate = async () => {
     if (!rawCode || rawCode.length < 50) {
       setError('请输入至少 50 个字符的代码以供分析。');
-      addLog('分析中段：代码长度不足 50 字符', 'warning');
+      addLog('分析中断：代码长度不足 50 字符', 'warning');
       return;
     }
+
+    // 中断之前的流
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     let finalLanguage = config.language;
     if (finalLanguage === 'auto') {
@@ -89,30 +99,66 @@ export function InputPanel() {
     }
 
     setError(null);
-    setIsAnalyzing(true);
-    addLog(`开始分析代码，目标语言：${finalLanguage}`, 'info');
+    streamStart();
+    addLog(`开始流式分析代码，目标语言：${finalLanguage}`, 'info');
 
     try {
-      addLog(`Prompt 组装完成，代码长度：${rawCode.length} 字符`, 'info');
-      addLog('正在调用 Gemini 模型...', 'info');
+      addLog('正在建立与 Gemini 的流式连接...', 'info');
       
       const startTime = Date.now();
-      const gResult = await analyzeCode(rawCode, { ...config, language: finalLanguage }, (req, res) => {
-        setRawRequest(req);
-        setRawResponse(res);
-      });
+      const stream = streamAnalyzeCode(
+        rawCode, 
+        { ...config, language: finalLanguage }, 
+        abortControllerRef.current
+      );
+
+      let fullText = '';
+      let isFirstChunk = true;
+
+      for await (const { chunk, accumulated } of stream) {
+        if (isFirstChunk) {
+          addLog('连接已建立，开始接收数据流', 'success');
+          isFirstChunk = false;
+        }
+        fullText = accumulated;
+        streamChunk(chunk, accumulated);
+      }
+
       const endTime = Date.now();
+      addLog(`数据接收完成，共 ${fullText.length.toLocaleString()} 字符，耗时 ${((endTime - startTime)/1000).toFixed(1)} 秒`, 'success');
       
-      addLog(`AI 响应接收成功，耗时 ${((endTime - startTime)/1000).toFixed(1)} 秒`, 'success');
-      setResult(gResult);
+      addLog('正在解析 JSON 结构...', 'info');
+      try {
+        const parsedResult = extractJsonFromStream(fullText);
+        setRawResponse(parsedResult as any); // 记录作为结果
+        
+        const summary = calculateSummary(parsedResult.annotatedCode, parsedResult.requirementDoc, rawCode);
+        setParseSummary(summary);
+        
+        addLog(`解析完成，识别到 ${summary.methodCount} 个方法、${summary.detectedRules} 条业务规则，开始渲染`, 'success');
+        addLog('正在动态渲染需求文档与代码...', 'info');
+        
+        // 触发打字机效果
+        streamEnd(parsedResult);
+
+      } catch (parseErr: any) {
+        // 如果 JSON 解析完全失败，回退到普通显示模式
+        addLog(`JSON 解析失败，已回退到文本展示：${parseErr.message}`, 'warning');
+        const fallbackResult = {
+          summary: "解析失败，原始内容显示",
+          requirementDoc: fullText,
+          annotatedCode: "// [解析失败] 原始输出如下：\n" + fullText
+        };
+        setResult(fallbackResult);
+      }
       
-      const summary = calculateSummary(gResult.annotatedCode, gResult.requirementDoc, rawCode);
-      setParseSummary(summary);
-      addLog(`解析完成，识别到 ${summary.methodCount} 个方法、${summary.detectedRules} 条业务规则`, 'success');
-      addLog('文档与代码渲染完成', 'success');
     } catch (err: any) {
-      setError(err.message || '分析过程中发生错误，请重试。');
-      addLog(`错误：${err.message}`, 'error');
+      if (err.name === 'AbortError') {
+        addLog('分析已由用户中断', 'warning');
+      } else {
+        setError(err.message || '分析过程中发生错误，请重试。');
+        addLog(`错误：${err.message}`, 'error');
+      }
     } finally {
       setIsAnalyzing(false);
     }

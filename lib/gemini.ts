@@ -35,6 +35,46 @@ export async function detectLanguage(code: string): Promise<string> {
   }
 }
 
+/**
+ * [第四轮新增] 流式分析代码
+ */
+export async function* streamAnalyzeCode(
+  code: string, 
+  config: AnalysisConfig,
+  abortController?: AbortController
+) {
+  if (!API_KEY) {
+    throw new Error("API Key 未配置");
+  }
+
+  const prompt = getAnalysisPrompt(code, config);
+  
+  // 流式请求
+  const result = await ai.models.generateContentStream({
+    model: PRIMARY_MODEL,
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      temperature: 0.2,
+    }
+  });
+
+  let accumulated = '';
+  
+  for await (const chunk of result) {
+    // 检查是否已中止
+    if (abortController?.signal.aborted) {
+      break;
+    }
+    
+    const text = chunk.text || "";
+    accumulated += text;
+    yield { chunk: text, accumulated };
+  }
+
+  return accumulated;
+}
+
 export async function analyzeCode(
   code: string, 
   config: AnalysisConfig,
@@ -51,7 +91,7 @@ export async function analyzeCode(
     model: PRIMARY_MODEL,
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      systemInstruction: SYSTEM_PROMPT,
       responseMimeType: "application/json",
     }
   };
@@ -61,7 +101,7 @@ export async function analyzeCode(
       model: modelName,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        systemInstruction: SYSTEM_PROMPT,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,

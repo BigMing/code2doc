@@ -7,7 +7,8 @@ import React from 'react';
 import { 
   Save, 
   RotateCw, 
-  Database
+  Database,
+  Forward
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -18,7 +19,8 @@ import { HistoryPopover } from './history-popover';
 export function TopActionBar() {
   const { 
     result, rawCode, config, isAnalyzing, 
-    addLog, clearRawData 
+    addLog, clearRawData,
+    showSkipButton, skipAnimation
   } = useAppContext();
 
   const handleSave = () => {
@@ -80,6 +82,18 @@ export function TopActionBar() {
              本地存储分析就绪
            </span>
         </div>
+
+        {showSkipButton && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={skipAnimation}
+            className="h-8 text-[11px] font-bold uppercase tracking-wider gap-1.5 animate-in fade-in slide-in-from-right-2"
+          >
+            <Forward className="w-3.5 h-3.5" />
+            跳过动画
+          </Button>
+        )}
         
         <Button 
           variant="ghost" 

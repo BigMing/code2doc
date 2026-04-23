@@ -7,11 +7,25 @@ import { Terminal, Activity, Code2, Copy, Check, Clock, Info, CheckCircle2, Aler
 import { motion } from 'motion/react';
 
 export function LogPanel() {
-  const { logs, parseSummary, rawRequest, rawResponse, activeLogTab, jsonViewTab } = useAppContext() as any; // Using any for brevity or I'll define local state if needed
-  // Note: The context I updated has these, but let's manage internal layout tabs here
+  const { 
+    logs, parseSummary, rawRequest, rawResponse,
+    isStreaming, accumulatedRawText 
+  } = useAppContext();
+  
   const [localTab, setLocalTab] = useState<'summary' | 'json'>('summary');
   const [localJsonTab, setLocalJsonTab] = useState<'request' | 'response'>('request');
   const [copied, setCopied] = useState(false);
+  const logScrollRef = React.useRef<HTMLDivElement>(null);
+  const streamScrollRef = React.useRef<HTMLDivElement>(null);
+
+  // 自动滚动控制
+  React.useEffect(() => {
+    if (logScrollRef.current) logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight;
+  }, [logs]);
+
+  React.useEffect(() => {
+    if (streamScrollRef.current) streamScrollRef.current.scrollTop = streamScrollRef.current.scrollHeight;
+  }, [accumulatedRawText]);
 
   const handleCopy = () => {
     const data = localJsonTab === 'request' ? rawRequest : rawResponse;
@@ -67,7 +81,12 @@ export function LogPanel() {
                   </div>
                 ) : (
                   logs.map((log: any) => (
-                    <div key={log.id} className="flex gap-2.5 items-start">
+                    <div key={log.id} className={`flex gap-2.5 items-start p-1.5 rounded transition-colors ${
+                      log.type === 'error' ? 'bg-red-50/50 border-l-2 border-red-500' : 
+                      log.type === 'success' ? 'bg-emerald-50/50 border-l-2 border-emerald-500' :
+                      log.type === 'warning' ? 'bg-amber-50/50 border-l-2 border-amber-500' : 
+                      'border-l-2 border-blue-500'
+                    }`}>
                       <div className="mt-0.5 shrink-0">{getLogIcon(log.type)}</div>
                       <div className="flex flex-col">
                         <span className="text-[10px] font-mono text-slate-400 leading-none mb-0.5">{log.timestamp}</span>
@@ -114,6 +133,21 @@ export function LogPanel() {
               </button>
             </div>
             <div className="flex-1 overflow-auto p-3 font-mono text-[11px] text-emerald-400/80 custom-scrollbar leading-relaxed">
+              {localJsonTab === 'response' && isStreaming && (
+                <div className="mb-4 bg-slate-950 p-2 rounded border border-white/10 shadow-inner">
+                  <div className="flex items-center gap-2 mb-2 pb-1 border-b border-white/5">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">实时流数据预览</span>
+                  </div>
+                  <div 
+                    ref={streamScrollRef}
+                    className="max-h-40 overflow-auto text-[10px] text-green-400 leading-tight"
+                  >
+                    {accumulatedRawText}
+                    <span className="animate-pulse">▋</span>
+                  </div>
+                </div>
+              )}
               <pre className="whitespace-pre-wrap break-all">
                 {JSON.stringify(truncateJsonStrings(localJsonTab === 'request' ? rawRequest : rawResponse), null, 2)}
               </pre>
