@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { PROVIDERS, getDefaultModel } from '@/lib/ai-config';
+import { PROVIDERS, getDefaultModel, getDefaultBaseUrl, allowCustomBaseUrl } from '@/lib/ai-config';
 import { Settings, KeyRound, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -30,31 +30,48 @@ export function ModelConfigDialog() {
   const [provider, setProvider] = useState(modelConfig.provider);
   const [model, setModel] = useState(modelConfig.model);
   const [apiKey, setApiKey] = useState(modelConfig.apiKey);
+  const [baseUrl, setBaseUrl] = useState(modelConfig.baseUrl || '');
 
   // 当外部 modelConfig 变化时同步（如从历史记录加载）
   useEffect(() => {
     setProvider(modelConfig.provider);
     setModel(modelConfig.model);
     setApiKey(modelConfig.apiKey);
+    setBaseUrl(modelConfig.baseUrl || '');
   }, [modelConfig]);
 
-  // provider 切换时，自动选择该 provider 的第一个模型
+  // provider 切换时，自动选择该 provider 的第一个模型和默认地址
   const handleProviderChange = (p: string) => {
-    setProvider(p as typeof modelConfig.provider);
-    setModel(getDefaultModel(p as typeof modelConfig.provider));
+    const newProvider = p as typeof modelConfig.provider;
+    setProvider(newProvider);
+    setModel(getDefaultModel(newProvider));
+    const defaultUrl = getDefaultBaseUrl(newProvider);
+    setBaseUrl(defaultUrl || '');
   };
 
   const currentProvider = PROVIDERS.find(p => p.id === provider);
 
   const handleSave = () => {
-    if (!apiKey.trim()) {
+    // 仅对必须填写 Key 的提供商做校验（私有化模型允许空 Key）
+    const needsKey = !['qwen-private'].includes(provider);
+    if (needsKey && !apiKey.trim()) {
       toast.error('请填写 API Key');
       return;
+    }
+    // 对支持自定义地址的提供商，校验地址格式
+    if (allowCustomBaseUrl(provider) && baseUrl.trim()) {
+      try {
+        new URL(baseUrl.trim());
+      } catch {
+        toast.error('API 地址格式不正确');
+        return;
+      }
     }
     setModelConfig({
       provider,
       model,
       apiKey: apiKey.trim(),
+      baseUrl: allowCustomBaseUrl(provider) ? baseUrl.trim() || undefined : undefined,
     });
     toast.success('模型配置已保存');
     setOpen(false);
@@ -142,6 +159,9 @@ export function ModelConfigDialog() {
             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <KeyRound className="w-3 h-3" />
               API Key
+              {provider === 'qwen-private' && (
+                <span className="text-[9px] font-normal text-slate-400 normal-case tracking-normal">（可选）</span>
+              )}
             </label>
             <input
               type="password"
@@ -154,6 +174,27 @@ export function ModelConfigDialog() {
               <p className="text-[10px] text-slate-400">{currentProvider.keyHint}</p>
             )}
           </div>
+
+          {/* 自定义 API 地址（私有化部署） */}
+          {allowCustomBaseUrl(provider) && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                API 地址
+                <span className="text-[9px] font-normal text-amber-500 normal-case tracking-normal">（私有化部署必填）</span>
+              </label>
+              <input
+                type="text"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder={currentProvider?.defaultBaseUrl || 'http://localhost:8000/v1'}
+                className="w-full h-9 px-3 text-xs border border-slate-200 rounded bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none font-mono"
+              />
+              <p className="text-[10px] text-slate-400">
+                请输入兼容 OpenAI 格式的 API Base URL，需以 /v1 结尾
+              </p>
+            </div>
+          )}
 
           {/* 当前配置摘要 */}
           <div className="bg-slate-50 rounded border border-slate-100 p-2.5 space-y-1">
@@ -171,6 +212,12 @@ export function ModelConfigDialog() {
                 {hasKey ? '已配置' : '未配置'}
               </span>
             </div>
+            {modelConfig.baseUrl && (
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="text-slate-400">地址:</span>
+                <span className="text-blue-600 font-medium truncate max-w-[200px]">{modelConfig.baseUrl}</span>
+              </div>
+            )}
           </div>
         </div>
 

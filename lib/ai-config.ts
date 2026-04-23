@@ -1,6 +1,7 @@
 /**
  * [第五轮新增] 多模型配置管理
- * 支持 Google Gemini / OpenAI / Anthropic Claude / 阿里通义千问
+ * 支持 Google Gemini / OpenAI / Anthropic Claude / 阿里通义千问 / GLM / DeepSeek
+ * 以及私有化部署的自定义模型（兼容 OpenAI 格式）
  */
 
 import { AiProvider, ModelConfig, ProviderInfo } from './types';
@@ -45,8 +46,8 @@ export const PROVIDERS: ProviderInfo[] = [
   },
   {
     id: 'qwen',
-    label: '阿里通义千问',
-    description: '阿里云通义千问系列模型（兼容 OpenAI 格式）',
+    label: '阿里通义千问（公有云）',
+    description: '阿里云 DashScope 通义千问系列模型',
     models: [
       { value: 'qwen-max', label: 'Qwen Max' },
       { value: 'qwen-plus', label: 'Qwen Plus' },
@@ -55,9 +56,59 @@ export const PROVIDERS: ProviderInfo[] = [
     keyPlaceholder: '请输入阿里云 DashScope API Key',
     keyHint: '从 https://dashscope.aliyun.com/ 获取',
   },
+  {
+    id: 'qwen-private',
+    label: '通义千问（私有化）',
+    description: '企业内部私有化部署的通义千问模型（兼容 OpenAI 格式）',
+    models: [
+      { value: 'qwen-max', label: 'Qwen Max' },
+      { value: 'qwen-plus', label: 'Qwen Plus' },
+      { value: 'qwen-turbo', label: 'Qwen Turbo' },
+      { value: 'qwen2.5-72b-instruct', label: 'Qwen2.5 72B Instruct' },
+      { value: 'qwen2.5-32b-instruct', label: 'Qwen2.5 32B Instruct' },
+      { value: 'qwen2.5-14b-instruct', label: 'Qwen2.5 14B Instruct' },
+      { value: 'qwen2.5-7b-instruct', label: 'Qwen2.5 7B Instruct' },
+      { value: 'custom', label: '自定义模型名称' },
+    ],
+    keyPlaceholder: '请输入 API Key（如需）',
+    keyHint: '私有化部署通常不需要 Key，或按企业内部规范填写',
+    defaultBaseUrl: 'http://localhost:8000/v1',
+    allowCustomBaseUrl: true,
+  },
+  {
+    id: 'glm',
+    label: '智谱 GLM',
+    description: '智谱 AI GLM 系列模型（兼容 OpenAI 格式）',
+    models: [
+      { value: 'glm-4', label: 'GLM-4' },
+      { value: 'glm-4-plus', label: 'GLM-4 Plus' },
+      { value: 'glm-4-flash', label: 'GLM-4 Flash' },
+      { value: 'glm-4-air', label: 'GLM-4 Air' },
+      { value: 'glm-4-9b', label: 'GLM-4 9B' },
+      { value: 'chatglm3-6b', label: 'ChatGLM3-6B' },
+    ],
+    keyPlaceholder: '请输入智谱 AI API Key',
+    keyHint: '从 https://open.bigmodel.cn/ 获取',
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    allowCustomBaseUrl: true,
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    description: 'DeepSeek 系列模型（兼容 OpenAI 格式）',
+    models: [
+      { value: 'deepseek-chat', label: 'DeepSeek-V3' },
+      { value: 'deepseek-reasoner', label: 'DeepSeek-R1' },
+      { value: 'deepseek-coder', label: 'DeepSeek Coder' },
+    ],
+    keyPlaceholder: '请输入 DeepSeek API Key',
+    keyHint: '从 https://platform.deepseek.com/ 获取',
+    defaultBaseUrl: 'https://api.deepseek.com/v1',
+    allowCustomBaseUrl: true,
+  },
 ];
 
-const CONFIG_KEY = 'CODE2DOC_MODEL_CONFIG_V1';
+const CONFIG_KEY = 'CODE2DOC_MODEL_CONFIG_V2';
 
 export const DEFAULT_CONFIG: ModelConfig = {
   provider: 'gemini',
@@ -80,6 +131,14 @@ export function loadModelConfig(): ModelConfig {
       const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
       if (envKey) {
         return { ...DEFAULT_CONFIG, apiKey: envKey };
+      }
+      // 尝试读取旧版本配置 key
+      const oldRaw = localStorage.getItem('CODE2DOC_MODEL_CONFIG_V1');
+      if (oldRaw) {
+        const old = JSON.parse(oldRaw);
+        localStorage.removeItem('CODE2DOC_MODEL_CONFIG_V1');
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(old));
+        return old as ModelConfig;
       }
       return { ...DEFAULT_CONFIG };
     }
@@ -130,4 +189,18 @@ export function getProviderLabel(provider: AiProvider): string {
 export function getModelLabel(provider: AiProvider, model: string): string {
   const p = PROVIDERS.find(x => x.id === provider);
   return p?.models.find(m => m.value === model)?.label || model;
+}
+
+/**
+ * 获取 provider 的默认 API 地址
+ */
+export function getDefaultBaseUrl(provider: AiProvider): string | undefined {
+  return PROVIDERS.find(p => p.id === provider)?.defaultBaseUrl;
+}
+
+/**
+ * 判断 provider 是否支持自定义 API 地址
+ */
+export function allowCustomBaseUrl(provider: AiProvider): boolean {
+  return !!PROVIDERS.find(p => p.id === provider)?.allowCustomBaseUrl;
 }

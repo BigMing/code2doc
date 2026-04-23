@@ -439,20 +439,34 @@ class AnthropicClient {
 // ============================================================
 
 function createClient(modelConfig: ModelConfig) {
-  const { provider, apiKey, model } = modelConfig;
-
-  if (!apiKey) {
-    throw new Error(`API Key 未配置：请在「模型配置」中设置 ${provider} 的密钥`);
-  }
+  const { provider, apiKey, model, baseUrl } = modelConfig;
 
   switch (provider) {
     case 'gemini':
+      if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置 Gemini 密钥');
       return new GeminiClient(apiKey, model);
     case 'openai':
+      if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置 OpenAI 密钥');
       return new OpenAiCompatibleClient({ apiKey, model, baseUrl: 'https://api.openai.com/v1' });
     case 'qwen':
+      if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置阿里云 DashScope 密钥');
       return new OpenAiCompatibleClient({ apiKey, model, baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' });
+    case 'qwen-private': {
+      const url = baseUrl || 'http://localhost:8000/v1';
+      return new OpenAiCompatibleClient({ apiKey: apiKey || 'none', model, baseUrl: url });
+    }
+    case 'glm': {
+      const glmUrl = baseUrl || 'https://open.bigmodel.cn/api/paas/v4';
+      if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置智谱 AI 密钥');
+      return new OpenAiCompatibleClient({ apiKey, model, baseUrl: glmUrl });
+    }
+    case 'deepseek': {
+      const dsUrl = baseUrl || 'https://api.deepseek.com/v1';
+      if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置 DeepSeek 密钥');
+      return new OpenAiCompatibleClient({ apiKey, model, baseUrl: dsUrl });
+    }
     case 'anthropic':
+      if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置 Anthropic 密钥');
       return new AnthropicClient(apiKey, model);
     default:
       throw new Error(`不支持的模型提供商: ${provider}`);
