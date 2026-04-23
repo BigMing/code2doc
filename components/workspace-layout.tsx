@@ -32,6 +32,23 @@ export function WorkspaceLayout() {
           </div>
         </div>
 
+        {/* [第五轮新增] 中间作者信息 */}
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 border border-blue-100/60 flex items-center gap-2 shadow-sm">
+            <span className="text-[11px] font-bold text-blue-700 tracking-wide">
+              忙里偷闲
+            </span>
+            <span className="text-[10px] text-blue-300">·</span>
+            <span className="text-[10px] font-semibold text-blue-600">
+              技术服务中心
+            </span>
+            <span className="text-[10px] text-blue-300">·</span>
+            <span className="text-[10px] text-blue-500">
+              孙佳明、胡飞、陈庆
+            </span>
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
           <div className="px-2 py-1 rounded bg-slate-50 border border-slate-100 flex items-center gap-2">
             <Cpu className="w-3.5 h-3.5 text-amber-500" />
