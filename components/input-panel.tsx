@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAppContext } from '@/lib/context';
-import { streamAnalyzeCode, detectLanguage } from '@/lib/gemini';
+import { streamAnalyzeCode, detectLanguage } from '@/lib/ai-client';
 import { AiParseSummary } from '@/lib/types';
 import { calculateSummary } from '@/lib/summary';
 import { extractJsonFromStream } from '@/lib/stream-parser';

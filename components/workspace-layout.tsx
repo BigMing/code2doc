@@ -8,10 +8,11 @@ import { DocPanel } from './doc-panel';
 import { CodePanel } from './code-panel';
 import { TopActionBar } from './top-action-bar';
 import { useAppContext } from '@/lib/context';
-import { Terminal, FileCode, CheckCircle2, Sparkles } from 'lucide-react';
+import { Terminal, FileCode, CheckCircle2, Sparkles, Cpu } from 'lucide-react';
+import { getProviderLabel, getModelLabel } from '@/lib/ai-config';
 
 export function WorkspaceLayout() {
-  const { result, config } = useAppContext();
+  const { result, config, modelConfig } = useAppContext();
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 overflow-hidden font-sans">
@@ -33,9 +34,9 @@ export function WorkspaceLayout() {
 
         <div className="flex items-center gap-3">
           <div className="px-2 py-1 rounded bg-slate-50 border border-slate-100 flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <Cpu className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              Gemini 3 Flash Pro
+              {getProviderLabel(modelConfig.provider)} · {getModelLabel(modelConfig.provider, modelConfig.model)}
             </span>
           </div>
         </div>
@@ -95,7 +96,7 @@ export function WorkspaceLayout() {
           <span>系统在线</span>
         </div>
         <div className="h-3 w-px bg-slate-200" />
-        <div>引擎: <span className="text-slate-600">Gemini 3 Flash Preview</span></div>
+        <div>引擎: <span className="text-slate-600">{getProviderLabel(modelConfig.provider)} · {getModelLabel(modelConfig.provider, modelConfig.model)}</span></div>
         <div className="h-3 w-px bg-slate-200" />
         <div className="ml-auto flex items-center gap-4">
           <span className="text-slate-300">UTF-8</span>

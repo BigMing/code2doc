@@ -1,9 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { AnalysisResult, AnalysisConfig, LogEntry, LogType, AiParseSummary } from '@/lib/types';
+import { AnalysisResult, AnalysisConfig, LogEntry, LogType, AiParseSummary, ModelConfig } from '@/lib/types';
 import { HistoryItem } from '@/lib/storage';
 import { calculateSummary } from '@/lib/summary';
+import { loadModelConfig, saveModelConfig } from '@/lib/ai-config';
+import { setGlobalModelConfig } from '@/lib/ai-client';
 
 interface AppState {
   rawCode: string;
@@ -23,6 +25,10 @@ interface AppState {
   fullDocText: string;
   fullCodeText: string;
   showSkipButton: boolean;
+
+  // [第五轮新增] 模型配置
+  modelConfig: ModelConfig;
+  setModelConfig: (config: ModelConfig) => void;
   
   setRawCode: (code: string) => void;
   setConfig: (config: AnalysisConfig) => void;
@@ -69,6 +75,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [fullDocText, setFullDocText] = useState('');
   const [fullCodeText, setFullCodeText] = useState('');
   const [showSkipButton, setShowSkipButton] = useState(false);
+
+  // [第五轮新增] 模型配置状态（从 localStorage 初始化）
+  const [modelConfig, setModelConfigState] = useState<ModelConfig>(() => {
+    const saved = loadModelConfig();
+    setGlobalModelConfig(saved);
+    return saved;
+  });
+
+  const setModelConfig = useCallback((cfg: ModelConfig) => {
+    setModelConfigState(cfg);
+    setGlobalModelConfig(cfg);
+    saveModelConfig(cfg);
+  }, []);
 
   const addLog = useCallback((message: string, type: LogType = 'info') => {
     const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
@@ -172,7 +191,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       streamEnd,
       setTypewriting,
       skipAnimation,
-      resetStreamState
+      resetStreamState,
+      // [第五轮新增] 模型配置
+      modelConfig,
+      setModelConfig,
     }}>
       {children}
     </AppContext.Provider>

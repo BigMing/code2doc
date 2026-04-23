@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useAppContext } from '@/lib/context';
 import { generateTitle, saveToStorage } from '@/lib/storage';
 import { HistoryPopover } from './history-popover';
+import { ModelConfigDialog } from './model-config-dialog';
 
 export function TopActionBar() {
   const { 
@@ -70,6 +71,7 @@ export function TopActionBar() {
           💾 保存分析
         </Button>
         <HistoryPopover />
+        <ModelConfigDialog />
       </div>
 
       <div className="h-4 w-px bg-slate-200 mx-2" />

@@ -27,3 +27,26 @@ export interface AiParseSummary {
   detectedRules: number;    // 检测到的业务规则数
   codeLines: number;        // 原始代码行数
 }
+
+// [第五轮新增] 多模型配置类型
+export type AiProvider = 'gemini' | 'openai' | 'anthropic' | 'qwen';
+
+export interface ModelOption {
+  value: string;
+  label: string;
+}
+
+export interface ProviderInfo {
+  id: AiProvider;
+  label: string;
+  description: string;
+  models: ModelOption[];
+  keyPlaceholder: string;
+  keyHint: string;
+}
+
+export interface ModelConfig {
+  provider: AiProvider;
+  model: string;
+  apiKey: string;
+}
