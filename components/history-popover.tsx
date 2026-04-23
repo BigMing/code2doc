@@ -66,7 +66,7 @@ export function HistoryPopover() {
         render={
           <Button variant="outline" size="sm" className="h-8 gap-1.5 border-slate-200">
             <History className="w-3.5 h-3.5" />
-            📜 历史记录
+            历史记录
             <span className="ml-1 text-[10px] text-slate-400">▼</span>
           </Button>
         }

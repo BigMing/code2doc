@@ -68,7 +68,7 @@ export function TopActionBar() {
           title={!result ? "请先生成分析结果" : ""}
         >
           <Save className="w-3.5 h-3.5" />
-          💾 保存分析
+          保存分析
         </Button>
         <HistoryPopover />
         <ModelConfigDialog />
