@@ -64,25 +64,27 @@ export function ModelConfigDialog() {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 text-[11px] font-bold uppercase tracking-wider gap-1.5 ${
-            hasKey
-              ? 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
-              : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
-          }`}
-        >
-          {hasKey ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-          ) : (
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-          )}
-          <Settings className="w-3.5 h-3.5" />
-          模型配置
-        </Button>
-      </AlertDialogTrigger>
+      <AlertDialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 text-[11px] font-bold uppercase tracking-wider gap-1.5 ${
+              hasKey
+                ? 'text-slate-500 hover:text-blue-600 hover:bg-blue-50'
+                : 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
+            }`}
+          >
+            {hasKey ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+            )}
+            <Settings className="w-3.5 h-3.5" />
+            模型配置
+          </Button>
+        }
+      />
 
       <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
