@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, Type } from '@google/genai';
-import { AnalysisResult, AnalysisConfig, ModelConfig, AiProvider } from './types';
+import { AnalysisResult, AnalysisConfig, ModelConfig, AiProvider, TokenUsage } from './types';
 import { SYSTEM_PROMPT, getAnalysisPrompt } from './prompt-template';
 
 // ============================================================
@@ -89,11 +89,21 @@ class GeminiClient {
     });
 
     let accumulated = '';
+    let lastUsage: TokenUsage | undefined;
     for await (const chunk of result) {
       if (abortController?.signal.aborted) break;
       const text = chunk.text || '';
       accumulated += text;
-      yield { chunk: text, accumulated };
+      // Gemini 流式 token 统计
+      const meta = (chunk as any).usageMetadata;
+      if (meta) {
+        lastUsage = {
+          promptTokens: meta.promptTokenCount || 0,
+          completionTokens: meta.candidatesTokenCount || 0,
+          totalTokens: meta.totalTokenCount || 0,
+        };
+      }
+      yield { chunk: text, accumulated, usage: lastUsage };
     }
     return accumulated;
   }
@@ -238,9 +248,18 @@ class OpenAiCompatibleClient {
             try {
               const json = JSON.parse(trimmed.slice(6));
               const text = json.choices?.[0]?.delta?.content || '';
-              if (text) {
+              // OpenAI 兼容格式 token 统计（通常只在最后一个 chunk 出现）
+              let usage: TokenUsage | undefined;
+              if (json.usage) {
+                usage = {
+                  promptTokens: json.usage.prompt_tokens || 0,
+                  completionTokens: json.usage.completion_tokens || 0,
+                  totalTokens: json.usage.total_tokens || 0,
+                };
+              }
+              if (text || usage) {
                 accumulated += text;
-                yield { chunk: text, accumulated };
+                yield { chunk: text, accumulated, usage };
               }
             } catch {
               // ignore malformed SSE line
@@ -373,9 +392,18 @@ class AnthropicClient {
             try {
               const json = JSON.parse(trimmed.slice(6));
               const text = json.delta?.text || '';
-              if (text) {
+              // Anthropic token 统计
+              let usage: TokenUsage | undefined;
+              if (json.usage) {
+                usage = {
+                  promptTokens: json.usage.input_tokens || 0,
+                  completionTokens: json.usage.output_tokens || 0,
+                  totalTokens: (json.usage.input_tokens || 0) + (json.usage.output_tokens || 0),
+                };
+              }
+              if (text || usage) {
                 accumulated += text;
-                yield { chunk: text, accumulated };
+                yield { chunk: text, accumulated, usage };
               }
             } catch {
               // ignore
@@ -468,6 +496,11 @@ function createClient(modelConfig: ModelConfig) {
     case 'anthropic':
       if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置 Anthropic 密钥');
       return new AnthropicClient(apiKey, model);
+    case 'kimi': {
+      const kimiUrl = baseUrl || 'https://api.moonshot.cn/v1';
+      if (!apiKey) throw new Error('API Key 未配置：请在「模型配置」中设置 Moonshot 密钥');
+      return new OpenAiCompatibleClient({ apiKey, model, baseUrl: kimiUrl });
+    }
     default:
       throw new Error(`不支持的模型提供商: ${provider}`);
   }

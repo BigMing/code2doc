@@ -3,13 +3,13 @@
 import React, { useState } from 'react';
 import { useAppContext } from '@/lib/context';
 import { truncateJsonStrings } from '@/lib/json-truncate';
-import { Terminal, Activity, Code2, Copy, Check, Clock, Info, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Terminal, Activity, Code2, Copy, Check, Clock, Info, CheckCircle2, AlertCircle, AlertTriangle, Zap } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export function LogPanel() {
   const { 
     logs, parseSummary, rawRequest, rawResponse,
-    isStreaming, accumulatedRawText 
+    isStreaming, accumulatedRawText, tokenUsage
   } = useAppContext();
   
   const [localTab, setLocalTab] = useState<'summary' | 'json'>('summary');
@@ -105,6 +105,9 @@ export function LogPanel() {
               <SummaryCard label="文档章节" value={parseSummary?.docSections || 0} unit="节" icon={<Activity className="w-3 h-3" />} />
               <SummaryCard label="业务规则" value={parseSummary?.detectedRules || 0} unit="项" icon={<Activity className="w-3 h-3" />} />
               <SummaryCard label="原始代码" value={parseSummary?.codeLines || 0} unit="行" icon={<Clock className="w-3 h-3" />} />
+              {tokenUsage && (
+                <SummaryCard label="Token 用量" value={tokenUsage.totalTokens} unit="" icon={<Zap className="w-3 h-3" />} detail={`输入 ${tokenUsage.promptTokens} / 输出 ${tokenUsage.completionTokens}`} />
+              )}
             </div>
           </div>
         ) : (
@@ -159,7 +162,7 @@ export function LogPanel() {
   );
 }
 
-function SummaryCard({ label, value, unit, icon }: { label: string, value: number, unit: string, icon: React.ReactNode }) {
+function SummaryCard({ label, value, unit, icon, detail }: { label: string, value: number, unit: string, icon: React.ReactNode, detail?: string }) {
   return (
     <div className="bg-white border border-slate-200/60 rounded-md p-2 flex flex-col gap-1 shadow-sm">
       <div className="flex items-center gap-1.5 text-slate-400">
@@ -170,6 +173,7 @@ function SummaryCard({ label, value, unit, icon }: { label: string, value: numbe
         <span className="text-sm font-black text-slate-800">{value}</span>
         <span className="text-[9px] font-bold text-slate-400">{unit}</span>
       </div>
+      {detail && <span className="text-[9px] text-slate-400 leading-none">{detail}</span>}
     </div>
   );
 }

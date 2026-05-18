@@ -29,7 +29,7 @@ export interface AiParseSummary {
 }
 
 // [第五轮新增] 多模型配置类型
-export type AiProvider = 'gemini' | 'openai' | 'anthropic' | 'qwen' | 'qwen-private' | 'glm' | 'deepseek';
+export type AiProvider = 'gemini' | 'openai' | 'anthropic' | 'qwen' | 'qwen-private' | 'glm' | 'deepseek' | 'kimi';
 
 export interface ModelOption {
   value: string;
@@ -52,4 +52,10 @@ export interface ModelConfig {
   model: string;
   apiKey: string;
   baseUrl?: string; // 自定义 API 地址（私有化部署时使用）
+}
+
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
 }

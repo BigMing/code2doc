@@ -9,20 +9,23 @@ import { CodePanel } from './code-panel';
 import { TopActionBar } from './top-action-bar';
 import { useAppContext } from '@/lib/context';
 import { Terminal, FileCode, CheckCircle2, Sparkles, Cpu } from 'lucide-react';
+import { Logo } from './logo';
 import { getProviderLabel, getModelLabel } from '@/lib/ai-config';
 
 export function WorkspaceLayout() {
   const { result, config, modelConfig } = useAppContext();
+
+  // [修复] hydration mismatch：modelConfig 从 localStorage 读取，SSR 与 CSR 不一致
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 overflow-hidden font-sans">
       {/* Top Navigation */}
       <header className="h-14 bg-white border-b border-[#E2E8F0] px-6 flex items-center justify-between z-20 shrink-0 shadow-sm">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#3B82F6] rounded flex items-center justify-center">
-              <span className="text-white text-xs font-black">C2D</span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <Logo size={32} />
             <h1 className="text-lg font-extrabold text-slate-800 tracking-tight">Code2Doc — 代码需求文档智能生成器</h1>
           </div>
           <div className="h-4 w-px bg-slate-200" />
@@ -53,7 +56,7 @@ export function WorkspaceLayout() {
           <div className="px-2 py-1 rounded bg-slate-50 border border-slate-100 flex items-center gap-2">
             <Cpu className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              {getProviderLabel(modelConfig.provider)} · {getModelLabel(modelConfig.provider, modelConfig.model)}
+              {mounted ? `${getProviderLabel(modelConfig.provider)} · ${getModelLabel(modelConfig.provider, modelConfig.model)}` : '加载中...'}
             </span>
           </div>
         </div>
@@ -68,11 +71,11 @@ export function WorkspaceLayout() {
           {/* 左侧：日志 + 输入 (纵向拆分) */}
           <Panel defaultSize={25} minSize={15}>
             <PanelGroup orientation="vertical">
-              <Panel defaultSize={35} minSize={20}>
+              <Panel defaultSize={55} minSize={25}>
                 <LogPanel />
               </Panel>
               <PanelResizeHandle className="h-1 bg-slate-200 hover:bg-blue-400 transition-colors cursor-row-resize" />
-              <Panel defaultSize={65} minSize={30}>
+              <Panel defaultSize={45} minSize={25}>
                 <InputPanel />
               </Panel>
             </PanelGroup>
@@ -113,7 +116,7 @@ export function WorkspaceLayout() {
           <span>系统在线</span>
         </div>
         <div className="h-3 w-px bg-slate-200" />
-        <div>引擎: <span className="text-slate-600">{getProviderLabel(modelConfig.provider)} · {getModelLabel(modelConfig.provider, modelConfig.model)}</span></div>
+        <div>引擎: <span className="text-slate-600">{mounted ? `${getProviderLabel(modelConfig.provider)} · ${getModelLabel(modelConfig.provider, modelConfig.model)}` : '加载中...'}</span></div>
         <div className="h-3 w-px bg-slate-200" />
         <div className="ml-auto flex items-center gap-4">
           <span className="text-slate-300">UTF-8</span>

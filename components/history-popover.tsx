@@ -40,16 +40,17 @@ export function HistoryPopover() {
   const [open, setOpen] = useState(false);
   const { loadHistoryItem, addLog } = useAppContext();
 
-  const handleOpenChange = (newOpen: boolean) => {
+  const handleOpenChange = async (newOpen: boolean) => {
     setOpen(newOpen);
     if (newOpen) {
-      setItems(loadFromStorage());
+      const data = await loadFromStorage();
+      setItems(data);
     }
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    removeFromStorage(id);
+    await removeFromStorage(id);
     setItems(prev => prev.filter(item => item.id !== id));
     toast.success('已删除历史记录');
     addLog('已从本地存储移除一条历史记录', 'info');

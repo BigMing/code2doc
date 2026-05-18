@@ -1,0 +1,18 @@
+services:
+  code2doc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: code2doc:latest
+    container_name: code2doc
+    ports:
+      - "3000:3000"
+    environment:
+      # 可选：配置默认 AI API Key
+      # NEXT_PUBLIC_GEMINI_API_KEY: your_api_key_here
+      # 数据持久化目录（容器内）
+      DATA_DIR: /app/data
+    volumes:
+      # 将容器数据持久化到宿主机本地路径
+      - ./data:/app/data
+    restart: unless-stopped

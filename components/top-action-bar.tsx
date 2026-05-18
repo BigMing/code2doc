@@ -24,9 +24,9 @@ export function TopActionBar() {
     showSkipButton, skipAnimation
   } = useAppContext();
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!result) return;
-    
+
     try {
       const title = generateTitle(rawCode, config.language);
       const now = new Date().toLocaleString('zh-CN', {
@@ -37,7 +37,7 @@ export function TopActionBar() {
         minute: '2-digit'
       });
 
-      saveToStorage({
+      await saveToStorage({
         id: `hist_${Date.now()}`,
         savedAt: now,
         title,

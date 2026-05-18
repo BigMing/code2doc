@@ -5,6 +5,7 @@
  */
 
 import { AiProvider, ModelConfig, ProviderInfo } from './types';
+import { apiSave, apiLoad } from './server-storage';
 
 export const PROVIDERS: ProviderInfo[] = [
   {
@@ -106,6 +107,21 @@ export const PROVIDERS: ProviderInfo[] = [
     defaultBaseUrl: 'https://api.deepseek.com/v1',
     allowCustomBaseUrl: true,
   },
+  {
+    id: 'kimi',
+    label: 'Kimi (Moonshot)',
+    description: '月之暗面 Kimi 系列模型（兼容 OpenAI 格式）',
+    models: [
+      { value: 'moonshot-v1-8k', label: 'Moonshot V1 8K' },
+      { value: 'moonshot-v1-32k', label: 'Moonshot V1 32K' },
+      { value: 'moonshot-v1-128k', label: 'Moonshot V1 128K' },
+      { value: 'moonshot-v1-auto', label: 'Moonshot V1 Auto' },
+    ],
+    keyPlaceholder: '请输入 Moonshot API Key',
+    keyHint: '从 https://platform.moonshot.cn/ 获取',
+    defaultBaseUrl: 'https://api.moonshot.cn/v1',
+    allowCustomBaseUrl: true,
+  },
 ];
 
 const CONFIG_KEY = 'CODE2DOC_MODEL_CONFIG_V2';
@@ -121,18 +137,14 @@ export const DEFAULT_CONFIG: ModelConfig = {
  * 兼容旧版本：若 localStorage 无配置但环境变量有 NEXT_PUBLIC_GEMINI_API_KEY，
  * 则自动将其作为 Gemini 默认密钥
  */
-export function loadModelConfig(): ModelConfig {
+async function loadFromLocal(): Promise<ModelConfig> {
   if (typeof window === 'undefined') return { ...DEFAULT_CONFIG };
 
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) {
-      // [第五轮新增] 兼容旧版本环境变量
       const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-      if (envKey) {
-        return { ...DEFAULT_CONFIG, apiKey: envKey };
-      }
-      // 尝试读取旧版本配置 key
+      if (envKey) return { ...DEFAULT_CONFIG, apiKey: envKey };
       const oldRaw = localStorage.getItem('CODE2DOC_MODEL_CONFIG_V1');
       if (oldRaw) {
         const old = JSON.parse(oldRaw);
@@ -144,28 +156,50 @@ export function loadModelConfig(): ModelConfig {
     }
 
     const parsed = JSON.parse(raw) as ModelConfig;
-    // 校验 provider 合法性
     const validProvider = PROVIDERS.find(p => p.id === parsed.provider);
     if (!validProvider) return { ...DEFAULT_CONFIG };
-
-    // 校验 model 是否属于当前 provider
     const validModel = validProvider.models.find(m => m.value === parsed.model);
-    if (!validModel) {
-      parsed.model = validProvider.models[0].value;
-    }
-
+    if (!validModel) parsed.model = validProvider.models[0].value;
     return parsed;
   } catch {
     return { ...DEFAULT_CONFIG };
   }
 }
 
+export async function loadModelConfig(): Promise<ModelConfig> {
+  try {
+    const serverData = await apiLoad(CONFIG_KEY);
+    if (serverData) {
+      const parsed = serverData as ModelConfig;
+      const validProvider = PROVIDERS.find(p => p.id === parsed.provider);
+      if (validProvider) {
+        const validModel = validProvider.models.find(m => m.value === parsed.model);
+        if (!validModel) parsed.model = validProvider.models[0].value;
+        // 同步回 localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(CONFIG_KEY, JSON.stringify(parsed));
+        }
+        return parsed;
+      }
+    }
+  } catch {
+    // 回退到 localStorage
+  }
+  return loadFromLocal();
+}
+
 /**
  * 保存模型配置到 localStorage
  */
-export function saveModelConfig(config: ModelConfig): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+export async function saveModelConfig(config: ModelConfig): Promise<void> {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  }
+  try {
+    await apiSave(CONFIG_KEY, config);
+  } catch {
+    // 服务端存储失败不影响本地体验
+  }
 }
 
 /**

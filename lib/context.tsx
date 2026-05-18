@@ -1,10 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { AnalysisResult, AnalysisConfig, LogEntry, LogType, AiParseSummary, ModelConfig } from '@/lib/types';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { AnalysisResult, AnalysisConfig, LogEntry, LogType, AiParseSummary, ModelConfig, TokenUsage } from '@/lib/types';
 import { HistoryItem } from '@/lib/storage';
 import { calculateSummary } from '@/lib/summary';
-import { loadModelConfig, saveModelConfig } from '@/lib/ai-config';
+import { loadModelConfig, saveModelConfig, DEFAULT_CONFIG } from '@/lib/ai-config';
 import { setGlobalModelConfig } from '@/lib/ai-client';
 
 interface AppState {
@@ -16,6 +16,10 @@ interface AppState {
   parseSummary: AiParseSummary | null;
   rawRequest: object | null;
   rawResponse: object | null;
+
+  // [第六轮新增] Token 使用量统计
+  tokenUsage: TokenUsage | null;
+  setTokenUsage: (usage: TokenUsage | null) => void;
 
   // [第四轮新增] 流式与打字机状态
   isStreaming: boolean;
@@ -66,6 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [parseSummary, setParseSummary] = useState<AiParseSummary | null>(null);
   const [rawRequest, setRawRequest] = useState<object | null>(null);
   const [rawResponse, setRawResponse] = useState<object | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
   // [第四轮新增] 流式与打字机状态组件内部实现
   const [isStreaming, setIsStreaming] = useState(false);
@@ -77,11 +82,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [showSkipButton, setShowSkipButton] = useState(false);
 
   // [第五轮新增] 模型配置状态（从 localStorage 初始化）
-  const [modelConfig, setModelConfigState] = useState<ModelConfig>(() => {
-    const saved = loadModelConfig();
-    setGlobalModelConfig(saved);
-    return saved;
-  });
+  const [modelConfig, setModelConfigState] = useState<ModelConfig>(DEFAULT_CONFIG);
+  const [modelConfigReady, setModelConfigReady] = useState(false);
+
+  useEffect(() => {
+    loadModelConfig().then(saved => {
+      setModelConfigState(saved);
+      setGlobalModelConfig(saved);
+      setModelConfigReady(true);
+    });
+  }, []);
 
   const setModelConfig = useCallback((cfg: ModelConfig) => {
     setModelConfigState(cfg);
@@ -105,6 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShowSkipButton(false);
     setResult(null);
     setParseSummary(null);
+    setTokenUsage(null);
   }, []);
 
   const streamStart = useCallback(() => {
@@ -176,6 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       parseSummary, setParseSummary,
       rawRequest, setRawRequest,
       rawResponse, setRawResponse,
+      tokenUsage, setTokenUsage,
       loadHistoryItem,
       clearRawData,
       // [第四轮新增] 流式状态导出

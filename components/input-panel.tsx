@@ -5,6 +5,7 @@ import { useAppContext } from '@/lib/context';
 import { streamAnalyzeCode, detectLanguage } from '@/lib/ai-client';
 import { AiParseSummary } from '@/lib/types';
 import { calculateSummary } from '@/lib/summary';
+import { getProviderLabel } from '@/lib/ai-config';
 import { extractJsonFromStream } from '@/lib/stream-parser';
 import { 
   FileCode, 
@@ -15,7 +16,8 @@ import {
   Wand2, 
   RotateCw,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -40,6 +42,8 @@ export function InputPanel() {
     isAnalyzing, setIsAnalyzing,
     addLog, setParseSummary,
     setRawRequest, setRawResponse,
+    modelConfig,
+    setTokenUsage,
     // [第四轮新增] 流式调度方法
     streamStart, streamChunk, streamEnd, resetStreamState
   } = useAppContext();
@@ -48,6 +52,47 @@ export function InputPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const abortControllerRef = React.useRef<AbortController | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const EXT_TO_LANGUAGE: Record<string, string> = {
+    '.java': 'java', '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
+    '.go': 'go', '.cpp': 'cpp', '.c': 'cpp', '.h': 'cpp', '.cs': 'csharp',
+    '.rb': 'ruby', '.rs': 'rust', '.swift': 'swift', '.kt': 'kotlin',
+    '.php': 'php', '.sql': 'sql', '.html': 'html', '.css': 'css', '.txt': 'auto',
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!EXT_TO_LANGUAGE[ext] && ext !== '.txt') {
+      addLog(`不支持的文件格式：${ext}，仅支持代码源文件及 .txt`, 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        setRawCode(content);
+        addLog(`已上传文件：${file.name}（${(file.size / 1024).toFixed(1)} KB）`, 'success');
+        // 自动识别语言
+        const detectedLang = EXT_TO_LANGUAGE[ext] || 'auto';
+        if (detectedLang !== 'auto') {
+          setConfig({ ...config, language: detectedLang });
+          addLog(`根据文件后缀自动识别语言：${detectedLang}`, 'info');
+        }
+      }
+    };
+    reader.onerror = () => {
+      addLog('文件读取失败，请重试', 'error');
+    };
+    reader.readAsText(file);
+
+    // 清空 input 值，允许重复上传同一文件
+    e.target.value = '';
+  };
 
   const handleDetectLanguage = React.useCallback(async (code: string) => {
     if (!code || code.length < 20 || config.language !== 'auto') return;
@@ -103,7 +148,7 @@ export function InputPanel() {
     addLog(`开始流式分析代码，目标语言：${finalLanguage}`, 'info');
 
     try {
-      addLog('正在建立与 Gemini 的流式连接...', 'info');
+      addLog(`正在建立与 ${getProviderLabel(modelConfig.provider)} 的流式连接...`, 'info');
       
       const startTime = Date.now();
       const stream = streamAnalyzeCode(
@@ -114,18 +159,33 @@ export function InputPanel() {
 
       let fullText = '';
       let isFirstChunk = true;
+      let lastUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null = null;
 
-      for await (const { chunk, accumulated } of stream) {
+      for await (const { chunk, accumulated, usage } of stream) {
         if (isFirstChunk) {
           addLog('连接已建立，开始接收数据流', 'success');
           isFirstChunk = false;
         }
         fullText = accumulated;
         streamChunk(chunk, accumulated);
+        if (usage) {
+          lastUsage = usage;
+        }
       }
 
       const endTime = Date.now();
-      addLog(`数据接收完成，共 ${fullText.length.toLocaleString()} 字符，耗时 ${((endTime - startTime)/1000).toFixed(1)} 秒`, 'success');
+      const elapsed = ((endTime - startTime) / 1000).toFixed(1);
+
+      // Token 统计日志
+      if (lastUsage && lastUsage.totalTokens > 0) {
+        setTokenUsage(lastUsage);
+        addLog(
+          `数据接收完成，共 ${fullText.length.toLocaleString()} 字符，Token：${lastUsage.totalTokens.toLocaleString()}（输入 ${lastUsage.promptTokens} / 输出 ${lastUsage.completionTokens}），耗时 ${elapsed} 秒`,
+          'success'
+        );
+      } else {
+        addLog(`数据接收完成，共 ${fullText.length.toLocaleString()} 字符，耗时 ${elapsed} 秒`, 'success');
+      }
       
       addLog('正在解析 JSON 结构...', 'info');
       try {
@@ -183,14 +243,30 @@ export function InputPanel() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 space-y-4 custom-scrollbar">
+      <div className="flex-1 overflow-auto p-4 space-y-3 custom-scrollbar">
+        {/* 文件上传 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".java,.py,.js,.ts,.go,.cpp,.c,.h,.cs,.rb,.rs,.swift,.kt,.php,.sql,.html,.css,.txt"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full h-9 border border-dashed border-slate-300 rounded bg-white hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 text-[11px] text-slate-500 hover:text-blue-600"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          点击上传代码文件或 .txt 文件
+        </button>
+
         {/* 代码编辑器 */}
         <div className="relative group">
           <textarea
             value={rawCode}
             onChange={(e) => setRawCode(e.target.value)}
             placeholder="// 请在此粘贴业务功能源代码..."
-            className="w-full h-80 p-4 font-mono text-xs border border-slate-200 rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none resize-none bg-white transition-shadow text-slate-600 leading-relaxed"
+            className="w-full h-56 p-4 font-mono text-xs border border-slate-200 rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none resize-none bg-white transition-shadow text-slate-600 leading-relaxed"
             spellCheck={false}
           />
         </div>
