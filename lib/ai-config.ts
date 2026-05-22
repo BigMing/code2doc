@@ -6,6 +6,7 @@
 
 import { AiProvider, ModelConfig, ProviderInfo } from './types';
 import { apiSave, apiLoad } from './server-storage';
+import { encrypt, decrypt } from './crypto';
 
 export const PROVIDERS: ProviderInfo[] = [
   {
@@ -156,6 +157,10 @@ async function loadFromLocal(): Promise<ModelConfig> {
     }
 
     const parsed = JSON.parse(raw) as ModelConfig;
+    // [优化] 解密 API Key
+    if (parsed.apiKey) {
+      parsed.apiKey = decrypt(parsed.apiKey);
+    }
     const validProvider = PROVIDERS.find(p => p.id === parsed.provider);
     if (!validProvider) return { ...DEFAULT_CONFIG };
     const validModel = validProvider.models.find(m => m.value === parsed.model);
@@ -171,13 +176,17 @@ export async function loadModelConfig(): Promise<ModelConfig> {
     const serverData = await apiLoad(CONFIG_KEY);
     if (serverData) {
       const parsed = serverData as ModelConfig;
+      // [优化] 解密 API Key
+      if (parsed.apiKey) {
+        parsed.apiKey = decrypt(parsed.apiKey);
+      }
       const validProvider = PROVIDERS.find(p => p.id === parsed.provider);
       if (validProvider) {
         const validModel = validProvider.models.find(m => m.value === parsed.model);
         if (!validModel) parsed.model = validProvider.models[0].value;
         // 同步回 localStorage
         if (typeof window !== 'undefined') {
-          localStorage.setItem(CONFIG_KEY, JSON.stringify(parsed));
+          localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...parsed, apiKey: encrypt(parsed.apiKey) }));
         }
         return parsed;
       }
@@ -192,11 +201,13 @@ export async function loadModelConfig(): Promise<ModelConfig> {
  * 保存模型配置到 localStorage
  */
 export async function saveModelConfig(config: ModelConfig): Promise<void> {
+  // [优化] 加密存储 API Key
+  const encryptedConfig = { ...config, apiKey: encrypt(config.apiKey) };
   if (typeof window !== 'undefined') {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(encryptedConfig));
   }
   try {
-    await apiSave(CONFIG_KEY, config);
+    await apiSave(CONFIG_KEY, encryptedConfig);
   } catch {
     // 服务端存储失败不影响本地体验
   }

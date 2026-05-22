@@ -1,9 +1,14 @@
 /**
- * 第四轮新增：流式响应与打字机效果
- * 流式文本累积、JSON 提取与容错解析工具
+ * [优化] 流式响应 JSON 提取与容错解析工具
+ * 统一处理模型返回的各种 JSON 包裹格式
  */
+
 import { AnalysisResult } from "./types";
 
+/**
+ * 从任意文本中提取有效的 JSON 对象
+ * 支持处理 Markdown 代码块包裹、首尾多余字符等场景
+ */
 export function extractJsonFromStream(text: string): AnalysisResult {
   let cleaned = text.trim();
   
@@ -14,21 +19,56 @@ export function extractJsonFromStream(text: string): AnalysisResult {
     cleaned = cleaned.replace(/^```\n?/, '').replace(/\n?```$/, '');
   }
 
+  // 2. 尝试直接解析清理后的文本
   try {
     return JSON.parse(cleaned) as AnalysisResult;
-  } catch (e) {
-    console.warn("标准 JSON 解析失败，尝试正则提取...", e);
-    
-    // 2. 正则提取第一个 {...} 块
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]) as AnalysisResult;
-      } catch (e2) {
-        throw new Error("模型返回的 JSON 结构损坏，无法解析。");
+  } catch {
+    // ignore
+  }
+  
+  // 3. 尝试提取第一个 {...} 块（最内层的大括号匹配）
+  // 使用栈计数法找到最外层的大括号范围
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (cleaned[i] === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const candidate = cleaned.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate) as AnalysisResult;
+        } catch {
+          // 继续搜索下一个可能的块
+          start = -1;
+        }
       }
     }
-    
-    throw new Error("未在响应中找到有效的 JSON 结构。");
+  }
+
+  // 4. 最后尝试正则提取（兜底方案）
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      return JSON.parse(match[0]) as AnalysisResult;
+    } catch {
+      throw new Error("模型返回的 JSON 结构损坏，无法解析。");
+    }
+  }
+  
+  throw new Error("未在响应中找到有效的 JSON 结构。");
+}
+
+/**
+ * 从流式累积文本中提取可能的 JSON 片段（用于实时预览）
+ */
+export function extractPartialJson(text: string): Partial<AnalysisResult> | null {
+  try {
+    const result = extractJsonFromStream(text);
+    return result;
+  } catch {
+    return null;
   }
 }

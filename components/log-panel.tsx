@@ -46,23 +46,23 @@ export function LogPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] border-b border-slate-200">
+    <div className="flex flex-col h-full bg-[#f8fafc] dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 transition-colors">
       {/* 头部面板 */}
-      <div className="h-10 bg-slate-100 border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
+      <div className="h-10 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-2">
-          <Terminal className="w-3.5 h-3.5 text-slate-500" />
-          <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">工作日志 (Logs)</h2>
+          <Terminal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+          <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">工作日志 (Logs)</h2>
         </div>
-        <div className="flex bg-slate-200 p-0.5 rounded-md">
+        <div className="flex bg-slate-200 dark:bg-slate-700 p-0.5 rounded-md">
           <button
             onClick={() => setLocalTab('summary')}
-            className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all ${localTab === 'summary' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all ${localTab === 'summary' ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
           >
             摘要
           </button>
           <button
             onClick={() => setLocalTab('json')}
-            className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all ${localTab === 'json' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`px-3 py-1 text-[10px] font-bold rounded-sm transition-all ${localTab === 'json' ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
           >
             原始JSON
           </button>
@@ -73,26 +73,31 @@ export function LogPanel() {
         {localTab === 'summary' ? (
           <div className="flex flex-col h-full gap-3">
             {/* 时间线 */}
-            <div className="flex-1 overflow-auto bg-white rounded-lg border border-slate-200 p-3 custom-scrollbar">
+            <div className="flex-1 overflow-auto bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3 custom-scrollbar">
               <div className="space-y-2.5">
                 {logs.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">
+                  <div className="h-full flex items-center justify-center text-slate-400 dark:text-slate-600 text-xs italic">
                     暂无日志，等待分析启动...
                   </div>
                 ) : (
                   logs.map((log: any) => (
-                    <div key={log.id} className={`flex gap-2.5 items-start p-1.5 rounded transition-colors ${
-                      log.type === 'error' ? 'bg-red-50/50 border-l-2 border-red-500' : 
-                      log.type === 'success' ? 'bg-emerald-50/50 border-l-2 border-emerald-500' :
-                      log.type === 'warning' ? 'bg-amber-50/50 border-l-2 border-amber-500' : 
-                      'border-l-2 border-blue-500'
-                    }`}>
+                    <motion.div 
+                      key={log.id} 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`flex gap-2.5 items-start p-1.5 rounded transition-colors ${
+                        log.type === 'error' ? 'bg-red-50/50 dark:bg-red-900/20 border-l-2 border-red-500' : 
+                        log.type === 'success' ? 'bg-emerald-50/50 dark:bg-emerald-900/20 border-l-2 border-emerald-500' :
+                        log.type === 'warning' ? 'bg-amber-50/50 dark:bg-amber-900/20 border-l-2 border-amber-500' : 
+                        'border-l-2 border-blue-500'
+                      }`}
+                    >
                       <div className="mt-0.5 shrink-0">{getLogIcon(log.type)}</div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-mono text-slate-400 leading-none mb-0.5">{log.timestamp}</span>
-                        <p className="text-xs text-slate-700 leading-tight">{log.message}</p>
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 leading-none mb-0.5">{log.timestamp}</span>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-tight">{log.message}</p>
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 )}
               </div>
@@ -164,16 +169,16 @@ export function LogPanel() {
 
 function SummaryCard({ label, value, unit, icon, detail }: { label: string, value: number, unit: string, icon: React.ReactNode, detail?: string }) {
   return (
-    <div className="bg-white border border-slate-200/60 rounded-md p-2 flex flex-col gap-1 shadow-sm">
-      <div className="flex items-center gap-1.5 text-slate-400">
+    <div className="bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-md p-2 flex flex-col gap-1 shadow-sm">
+      <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500">
         {icon}
         <span className="text-[9px] font-bold uppercase tracking-wider">{label}</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-sm font-black text-slate-800">{value}</span>
-        <span className="text-[9px] font-bold text-slate-400">{unit}</span>
+        <span className="text-sm font-black text-slate-800 dark:text-slate-100">{value}</span>
+        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500">{unit}</span>
       </div>
-      {detail && <span className="text-[9px] text-slate-400 leading-none">{detail}</span>}
+      {detail && <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-none">{detail}</span>}
     </div>
   );
 }

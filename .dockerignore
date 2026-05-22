@@ -1,6 +1,6 @@
 node_modules
 npm-debug.log
-.next/cache
+.next
 data
 .git
 .gitignore
@@ -8,3 +8,6 @@ README.md
 .env.local
 .env.example
 AGENTS.md
+vitest.config.ts
+lib/__tests__
+*.test.ts

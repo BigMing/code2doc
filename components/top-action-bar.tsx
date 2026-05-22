@@ -1,5 +1,6 @@
 /**
- * 第三轮新增：顶部全局操作栏
+ * [优化] 顶部全局操作栏
+ * 增加暗色模式适配
  */
 'use client';
 
@@ -56,7 +57,7 @@ export function TopActionBar() {
   };
 
   return (
-    <div className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+    <div className="h-12 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 flex items-center justify-between shrink-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors">
       {/* 左侧：持久化操作 */}
       <div className="flex items-center gap-2">
         <Button 
@@ -64,7 +65,7 @@ export function TopActionBar() {
           size="sm" 
           disabled={!result || isAnalyzing}
           onClick={handleSave}
-          className="h-8 text-[11px] font-bold uppercase tracking-wider gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-40"
+          className="h-8 text-[11px] font-bold uppercase tracking-wider gap-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 disabled:opacity-40"
           title={!result ? "请先生成分析结果" : ""}
         >
           <Save className="w-3.5 h-3.5" />
@@ -74,13 +75,13 @@ export function TopActionBar() {
         <ModelConfigDialog />
       </div>
 
-      <div className="h-4 w-px bg-slate-200 mx-2" />
+      <div className="h-4 w-px bg-slate-200 dark:bg-slate-600 mx-2" />
 
       {/* 右侧：导出与重操作 */}
       <div className="flex items-center gap-2 ml-auto">
         <div className="hidden lg:flex items-center gap-2 mr-4">
-           <Database className="w-3.5 h-3.5 text-slate-300" />
-           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+           <Database className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
+           <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
              本地存储分析就绪
            </span>
         </div>
@@ -100,8 +101,8 @@ export function TopActionBar() {
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-8 text-[11px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 gap-1.5"
-          onClick={() => window.location.reload()} // 简单的重置方案
+          className="h-8 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 gap-1.5"
+          onClick={() => window.location.reload()}
         >
           <RotateCw className="w-3.5 h-3.5" />
           重新分析

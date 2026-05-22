@@ -50,11 +50,11 @@ export function CodePanel({ code, language, title = "补全注释代码", showLi
   };
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden border-r border-slate-200 last:border-r-0">
-      <div className="h-10 bg-slate-50 border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
-        <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{title}</h2>
+    <div className="flex flex-col h-full bg-white dark:bg-slate-800 overflow-hidden border-r border-slate-200 dark:border-slate-700 last:border-r-0 transition-colors">
+      <div className="h-10 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
+        <h2 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{title}</h2>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-tight">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-tight">
             <Sparkles className="w-2.5 h-2.5" />
             AI 增强
           </div>
@@ -63,22 +63,22 @@ export function CodePanel({ code, language, title = "补全注释代码", showLi
             size="sm"
             onClick={handleCopy}
             disabled={!displayCode || isStreaming || isTypewriting}
-            className="h-7 px-2 text-[10px] font-bold uppercase gap-1.5 border-slate-200 disabled:opacity-40"
+            className="h-7 px-2 text-[10px] font-bold uppercase gap-1.5 border-slate-200 dark:border-slate-600 disabled:opacity-40 dark:text-slate-300"
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             {copied ? '已复制' : '复制代码'}
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50/30">
+      <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50/30 dark:bg-slate-900/30">
         {isStreaming && !displayCode && (
           <div className="p-6 space-y-4">
-            <Skeleton className="h-4 w-1/3 bg-slate-100" />
-            <Skeleton className="h-4 w-2/3 bg-slate-100" />
-            <Skeleton className="h-4 w-1/2 bg-slate-100" />
-            <Skeleton className="h-4 w-3/4 bg-slate-100" />
-            <Skeleton className="h-4 w-1/4 bg-slate-100" />
-            <p className="text-[10px] text-slate-400 italic text-center animate-pulse pt-10">正在准备增强代码输出...</p>
+            <Skeleton className="h-4 w-1/3 bg-slate-100 dark:bg-slate-700" />
+            <Skeleton className="h-4 w-2/3 bg-slate-100 dark:bg-slate-700" />
+            <Skeleton className="h-4 w-1/2 bg-slate-100 dark:bg-slate-700" />
+            <Skeleton className="h-4 w-3/4 bg-slate-100 dark:bg-slate-700" />
+            <Skeleton className="h-4 w-1/4 bg-slate-100 dark:bg-slate-700" />
+            <p className="text-[10px] text-slate-400 dark:text-slate-600 italic text-center animate-pulse pt-10">正在准备增强代码输出...</p>
           </div>
         )}
 
@@ -110,9 +110,9 @@ export function CodePanel({ code, language, title = "补全注释代码", showLi
         )}
 
         {!isStreaming && !code && !isTypewriting && (
-          <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-4">
-             <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
-                <FileCode className="w-8 h-8 text-slate-200" />
+          <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 gap-4">
+             <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-700 flex items-center justify-center">
+                <FileCode className="w-8 h-8 text-slate-200 dark:text-slate-600" />
              </div>
              <p className="text-xs font-medium">尚未生成增强代码</p>
           </div>

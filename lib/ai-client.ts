@@ -1,11 +1,14 @@
 /**
- * [第五轮新增] 统一 AI 调用层
+ * [第五轮新增/优化] 统一 AI 调用层
  * 封装 Gemini / OpenAI / Anthropic / Qwen 的多模型调用
+ * [优化] 消除 SSE 解析重复代码，统一使用 sse-parser.ts
  */
 
 import { GoogleGenAI, Type } from '@google/genai';
 import { AnalysisResult, AnalysisConfig, ModelConfig, AiProvider, TokenUsage } from './types';
 import { SYSTEM_PROMPT, getAnalysisPrompt } from './prompt-template';
+import { extractJsonFromStream } from './stream-parser';
+import { parseSseStream } from './sse-parser';
 
 // ============================================================
 // 公共工具
@@ -16,34 +19,6 @@ function buildMessages(prompt: string): { role: string; content: string }[] {
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: prompt },
   ];
-}
-
-function parseJsonResult(text: string): AnalysisResult {
-  // 先尝试直接解析
-  try {
-    return JSON.parse(text) as AnalysisResult;
-  } catch {
-    // 容错：提取 ```json ... ``` 或纯 JSON 块
-    const codeBlock = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlock) {
-      try {
-        return JSON.parse(codeBlock[1].trim()) as AnalysisResult;
-      } catch {
-        // ignore
-      }
-    }
-    // 查找第一个 { 和最后一个 }
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start !== -1 && end !== -1 && end > start) {
-      try {
-        return JSON.parse(text.slice(start, end + 1)) as AnalysisResult;
-      } catch {
-        // ignore
-      }
-    }
-  }
-  throw new Error('模型返回内容无法解析为 JSON');
 }
 
 function handleApiError(error: any, provider: string): never {
@@ -94,7 +69,6 @@ class GeminiClient {
       if (abortController?.signal.aborted) break;
       const text = chunk.text || '';
       accumulated += text;
-      // Gemini 流式 token 统计
       const meta = (chunk as any).usageMetadata;
       if (meta) {
         lastUsage = {
@@ -167,7 +141,7 @@ class GeminiClient {
 }
 
 // ============================================================
-// OpenAI 兼容实现（OpenAI / Qwen）
+// OpenAI 兼容实现（OpenAI / Qwen / GLM / DeepSeek / Kimi）
 // ============================================================
 
 interface OpenAiCompatibleConfig {
@@ -188,7 +162,7 @@ class OpenAiCompatibleClient {
     stream = false,
     signal?: AbortSignal
   ) {
-    const body: any = {
+    const body: Record<string, unknown> = {
       model: this.cfg.model,
       messages,
       temperature: 0.2,
@@ -227,51 +201,19 @@ class OpenAiCompatibleClient {
     const reader = res.body?.getReader();
     if (!reader) throw new Error('无法读取流式响应');
 
-    const decoder = new TextDecoder();
-    let accumulated = '';
-    let buffer = '';
-
-    try {
-      while (true) {
-        if (abortController?.signal.aborted) break;
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === 'data: [DONE]') continue;
-          if (trimmed.startsWith('data: ')) {
-            try {
-              const json = JSON.parse(trimmed.slice(6));
-              const text = json.choices?.[0]?.delta?.content || '';
-              // OpenAI 兼容格式 token 统计（通常只在最后一个 chunk 出现）
-              let usage: TokenUsage | undefined;
-              if (json.usage) {
-                usage = {
-                  promptTokens: json.usage.prompt_tokens || 0,
-                  completionTokens: json.usage.completion_tokens || 0,
-                  totalTokens: json.usage.total_tokens || 0,
-                };
-              }
-              if (text || usage) {
-                accumulated += text;
-                yield { chunk: text, accumulated, usage };
-              }
-            } catch {
-              // ignore malformed SSE line
-            }
-          }
-        }
+    const extractText = (json: any): string => json.choices?.[0]?.delta?.content || '';
+    const extractUsage = (json: any): TokenUsage | undefined => {
+      if (json.usage) {
+        return {
+          promptTokens: json.usage.prompt_tokens || 0,
+          completionTokens: json.usage.completion_tokens || 0,
+          totalTokens: json.usage.total_tokens || 0,
+        };
       }
-    } finally {
-      reader.releaseLock();
-    }
+      return undefined;
+    };
 
-    return accumulated;
+    yield* parseSseStream(reader, extractText, extractUsage, abortController?.signal);
   }
 
   async analyzeCode(
@@ -292,7 +234,7 @@ class OpenAiCompatibleClient {
 
     const text = data.choices?.[0]?.message?.content || '';
     if (!text) throw new Error('AI 未返回有效内容');
-    return parseJsonResult(text);
+    return extractJsonFromStream(text);
   }
 
   async detectLanguage(code: string): Promise<string> {
@@ -332,7 +274,7 @@ class AnthropicClient {
     stream = false,
     signal?: AbortSignal
   ) {
-    const body: any = {
+    const body: Record<string, unknown> = {
       model: this.model,
       max_tokens: 4096,
       system,
@@ -370,52 +312,19 @@ class AnthropicClient {
     const reader = res.body?.getReader();
     if (!reader) throw new Error('无法读取流式响应');
 
-    const decoder = new TextDecoder();
-    let accumulated = '';
-    let buffer = '';
-
-    try {
-      while (true) {
-        if (abortController?.signal.aborted) break;
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          if (trimmed.startsWith('event: ') || trimmed === 'data: [DONE]') continue;
-          if (trimmed.startsWith('data: ')) {
-            try {
-              const json = JSON.parse(trimmed.slice(6));
-              const text = json.delta?.text || '';
-              // Anthropic token 统计
-              let usage: TokenUsage | undefined;
-              if (json.usage) {
-                usage = {
-                  promptTokens: json.usage.input_tokens || 0,
-                  completionTokens: json.usage.output_tokens || 0,
-                  totalTokens: (json.usage.input_tokens || 0) + (json.usage.output_tokens || 0),
-                };
-              }
-              if (text || usage) {
-                accumulated += text;
-                yield { chunk: text, accumulated, usage };
-              }
-            } catch {
-              // ignore
-            }
-          }
-        }
+    const extractText = (json: any): string => json.delta?.text || '';
+    const extractUsage = (json: any): TokenUsage | undefined => {
+      if (json.usage) {
+        return {
+          promptTokens: json.usage.input_tokens || 0,
+          completionTokens: json.usage.output_tokens || 0,
+          totalTokens: (json.usage.input_tokens || 0) + (json.usage.output_tokens || 0),
+        };
       }
-    } finally {
-      reader.releaseLock();
-    }
+      return undefined;
+    };
 
-    return accumulated;
+    yield* parseSseStream(reader, extractText, extractUsage, abortController?.signal);
   }
 
   async analyzeCode(
@@ -441,7 +350,7 @@ class AnthropicClient {
 
     const text = data.content?.[0]?.text || '';
     if (!text) throw new Error('AI 未返回有效内容');
-    return parseJsonResult(text);
+    return extractJsonFromStream(text);
   }
 
   async detectLanguage(code: string): Promise<string> {
@@ -507,7 +416,7 @@ function createClient(modelConfig: ModelConfig) {
 }
 
 // ============================================================
-// 对外暴露的统一接口（与原来 gemini.ts 保持相同签名）
+// 对外暴露的统一接口
 // ============================================================
 
 let _globalModelConfig: ModelConfig | null = null;
