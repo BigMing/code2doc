@@ -19,8 +19,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { PROVIDERS, getDefaultModel, getDefaultBaseUrl, allowCustomBaseUrl } from '@/lib/ai-config';
-import { Settings, KeyRound, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Settings, KeyRound, CheckCircle2, AlertTriangle, Zap, ZapOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { getGlobalEnableStreaming, setGlobalEnableStreaming } from '@/lib/ai-client';
 
 export function ModelConfigDialog() {
   const { modelConfig, setModelConfig } = useAppContext();
@@ -31,6 +32,7 @@ export function ModelConfigDialog() {
   const [model, setModel] = useState(modelConfig.model);
   const [apiKey, setApiKey] = useState(modelConfig.apiKey);
   const [baseUrl, setBaseUrl] = useState(modelConfig.baseUrl || '');
+  const [enableStreaming, setEnableStreaming] = useState(getGlobalEnableStreaming());
 
   // 当外部 modelConfig 变化时同步（如从历史记录加载）
   useEffect(() => {
@@ -38,6 +40,7 @@ export function ModelConfigDialog() {
     setModel(modelConfig.model);
     setApiKey(modelConfig.apiKey);
     setBaseUrl(modelConfig.baseUrl || '');
+    setEnableStreaming(getGlobalEnableStreaming());
   }, [modelConfig]);
 
   // provider 切换时，自动选择该 provider 的第一个模型和默认地址
@@ -73,6 +76,7 @@ export function ModelConfigDialog() {
       apiKey: apiKey.trim(),
       baseUrl: allowCustomBaseUrl(provider) ? baseUrl.trim() || undefined : undefined,
     });
+    setGlobalEnableStreaming(enableStreaming);
     toast.success('模型配置已保存');
     setOpen(false);
   };
@@ -201,6 +205,35 @@ export function ModelConfigDialog() {
               </p>
             </div>
           )}
+
+          {/* [新增] 流式输出开关 */}
+          <div className="flex items-center justify-between bg-slate-50 rounded border border-slate-100 p-2.5">
+            <div className="flex items-center gap-2">
+              {enableStreaming ? (
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+              ) : (
+                <ZapOff className="w-3.5 h-3.5 text-slate-400" />
+              )}
+              <div>
+                <p className="text-[11px] font-bold text-slate-600">流式输出</p>
+                <p className="text-[10px] text-slate-400">
+                  {enableStreaming ? '实时显示生成进度（推荐）' : '等待完整响应后一次性显示'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setEnableStreaming(!enableStreaming)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                enableStreaming ? 'bg-blue-500' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                  enableStreaming ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
 
           {/* 当前配置摘要 */}
           <div className="bg-slate-50 rounded border border-slate-100 p-2.5 space-y-1">

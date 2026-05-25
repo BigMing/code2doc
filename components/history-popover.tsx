@@ -3,7 +3,7 @@
  */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   History, 
   Trash2, 
@@ -11,7 +11,9 @@ import {
   Code2, 
   ExternalLink,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  X
 } from 'lucide-react';
 import {
   Popover,
@@ -38,7 +40,17 @@ import { useAppContext } from '@/lib/context';
 export function HistoryPopover() {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { loadHistoryItem, addLog } = useAppContext();
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(item => 
+      item.title.toLowerCase().includes(q) || 
+      item.language.toLowerCase().includes(q)
+    );
+  }, [items, searchQuery]);
 
   const handleOpenChange = async (newOpen: boolean) => {
     setOpen(newOpen);
@@ -73,11 +85,30 @@ export function HistoryPopover() {
         }
       />
       <PopoverContent className="w-80 p-0 shadow-2xl border-slate-200" align="start">
-        <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+        <div className="p-3 border-b border-slate-100 bg-slate-50/50 space-y-2">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
             <Clock className="w-3.5 h-3.5" />
             最近分析历史
           </h3>
+          {/* [新增] 搜索框 */}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="搜索标题或语言..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8 pr-7 text-xs rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="max-h-96 overflow-auto custom-scrollbar">
           {items.length === 0 ? (
@@ -87,7 +118,7 @@ export function HistoryPopover() {
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <div 
                   key={item.id}
                   className="group relative hover:bg-slate-50 transition-colors"

@@ -33,7 +33,14 @@ interface AppState {
   // [第五轮新增] 模型配置
   modelConfig: ModelConfig;
   setModelConfig: (config: ModelConfig) => void;
-  
+
+  // [新增] 专注模式
+  isZenMode: boolean;
+  setZenMode: (v: boolean) => void;
+
+  // [新增] 重新生成
+  regenerateAnalysis: () => void;
+
   setRawCode: (code: string) => void;
   setConfig: (config: AnalysisConfig) => void;
   setResult: (result: AnalysisResult | null) => void;
@@ -80,6 +87,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [fullDocText, setFullDocText] = useState('');
   const [fullCodeText, setFullCodeText] = useState('');
   const [showSkipButton, setShowSkipButton] = useState(false);
+
+  // [新增] 专注模式
+  const [isZenMode, setZenMode] = useState(false);
 
   // [第五轮新增] 模型配置状态（从 localStorage 初始化）
   const [modelConfig, setModelConfigState] = useState<ModelConfig>(DEFAULT_CONFIG);
@@ -148,6 +158,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setShowSkipButton(false);
   }, []);
 
+  // [新增] 重新生成：保留代码和配置，清空结果后重新触发分析
+  const regenerateAnalysis = useCallback(() => {
+    resetStreamState();
+    setIsAnalyzing(false);
+    addLog('已重置状态，请重新点击生成', 'info');
+  }, [resetStreamState, addLog]);
+
   const clearLogs = useCallback(() => setLogs([]), []);
 
   const clearRawData = useCallback(() => {
@@ -207,6 +224,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // [第五轮新增] 模型配置
       modelConfig,
       setModelConfig,
+      // [新增] 专注模式
+      isZenMode,
+      setZenMode,
+      // [新增] 重新生成
+      regenerateAnalysis,
     }}>
       {children}
     </AppContext.Provider>

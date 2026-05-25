@@ -1,17 +1,18 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import rehypeHighlight from 'rehype-highlight';
-import { List, Download } from 'lucide-react';
+import { List, Download, FileText, Printer } from 'lucide-react';
 import { useAppContext } from '@/lib/context';
 import { downloadMarkdown, wrapMarkdown } from '@/lib/file-download';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useTypewriter } from '@/hooks/use-typewriter';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useReactToPrint } from 'react-to-print';
 
 interface DocPanelProps {
   content: string;
@@ -22,6 +23,17 @@ export function DocPanel({ content }: DocPanelProps) {
     config, addLog, 
     isStreaming, isTypewriting, fullDocText, setTypewriting 
   } = useAppContext();
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // [新增] PDF 打印
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `需求文档_${new Date().toLocaleDateString('zh-CN')}`,
+    onAfterPrint: () => {
+      toast.success('PDF 导出完成');
+      addLog('已导出 PDF 格式需求文档', 'success');
+    },
+  });
 
   // 使用打字机 Hook
   const { displayText, isComplete } = useTypewriter(fullDocText, isTypewriting, 8);
@@ -76,7 +88,17 @@ export function DocPanel({ content }: DocPanelProps) {
             onClick={handleExport}
           >
             <Download className="w-3.5 h-3.5" />
-            导出文档
+            Markdown
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            disabled={!content || isStreaming || isTypewriting}
+            className="h-7 px-2 text-[10px] font-bold uppercase gap-1.5 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 dark:text-slate-300"
+            onClick={handlePrint}
+          >
+            <Printer className="w-3.5 h-3.5" />
+            PDF
           </Button>
           {(toc.length > 0 || isTypewriting) && (
           <div className="relative group/toc">
@@ -154,6 +176,21 @@ export function DocPanel({ content }: DocPanelProps) {
             </div>
           </div>
         )}
+      </div>
+
+      {/* [新增] 打印专用隐藏区域 */}
+      <div className="hidden">
+        <div ref={printRef} className="p-8 prose prose-slate max-w-none">
+          <h1 className="text-2xl font-black text-slate-800 border-b-2 border-slate-200 pb-4 mb-8">
+            代码需求文档
+          </h1>
+          <div className="text-sm text-slate-500 mb-6">
+            生成时间：{new Date().toLocaleString('zh-CN')} · 语言：{config.language}
+          </div>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]}>
+            {content}
+          </ReactMarkdown>
+        </div>
       </div>
     </div>
   );

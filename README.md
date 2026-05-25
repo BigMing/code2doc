@@ -12,8 +12,13 @@ Code2Doc 是一款旨在解决长期运行系统中需求文档缺失、版本�
 - **流式响应 + 打字机效果**: AI 分析过程实时流式展示，文档与代码以打字机动画逐字渲染，支持跳过动画。
 - **Token 用量统计**: 实时展示 LLM 响应的 Token 消耗（输入 / 输出 / 总计）。
 - **文件上传**: 支持直接上传代码源文件（.java/.py/.js/.ts 等）或 .txt 文件，自动识别语言并填充。
-- **Markdown 导出**: 一键导出包含完整文档与代码的归档 Markdown 文件。
-- **历史记录**: 分析结果可保存到本地，最多保留 10 条历史记录，随时加载复用。Docker 部署时数据持久化到服务器挂载卷。
+- **Markdown / PDF 双格式导出**: 一键导出 Markdown 文件，或打印为 PDF 便于交付。
+- **历史记录**: 分析结果可保存到本地，最多保留 10 条历史记录，支持标题搜索与语言筛选，随时加载复用。Docker 部署时数据持久化到服务器挂载卷。
+- **专注模式 (Zen Mode)**: 一键隐藏非核心 UI，进入沉浸式代码分析工作态。
+- **Onboarding 引导**: 首次访问分步引导，快速上手核心操作流程。
+- **重新生成**: 保留代码与配置，一键清空结果重新分析，支持换模型对比。
+- **流式开关**: 模型配置面板支持手动关闭流式输出，兼容不支持 SSE 的私有化接口。
+- **语法高亮编辑器**: 代码输入区基于 CodeMirror 6，支持 Java / JavaScript / TypeScript / Python 语法高亮与行号。
 - **工作日志**: 实时展示分析流程日志与统计摘要（方法数、类数、章节数、业务规则数、Token 用量等）。
 
 ## 技术栈
@@ -24,7 +29,7 @@ Code2Doc 是一款旨在解决长期运行系统中需求文档缺失、版本�
 - **样式**: Tailwind CSS (v4)
 - **UI 组件**: shadcn/ui (base-nova 风格，底层基于 `@base-ui/react`)
 - **图标**: Lucide React
-- **辅助库**: react-markdown (文档渲染), react-syntax-highlighter (代码高亮), motion (动画), react-resizable-panels (分屏)
+- **辅助库**: react-markdown (文档渲染), react-syntax-highlighter (代码高亮), CodeMirror 6 (代码编辑), react-to-print (PDF 导出), motion (动画), react-resizable-panels (分屏), Zod (运行时校验)
 
 ## 本地开发指南
 
@@ -203,26 +208,51 @@ app/                    # Next.js App Router
   globals.css           # Tailwind 入口、主题变量
 components/             # React 组件（全部使用 'use client'）
   ui/                   # shadcn/ui 原语
-  workspace-layout.tsx  # 三栏分屏核心布局
-  input-panel.tsx       # 代码输入、文件上传、生成按钮
-  doc-panel.tsx         # Markdown 文档渲染
+  workspace-layout.tsx  # 三栏分屏核心布局（含专注模式）
+  input-panel.tsx       # 代码输入（CodeMirror）、文件上传、生成按钮、进度指示
+  doc-panel.tsx         # Markdown 文档渲染 + PDF 导出
   code-panel.tsx        # 语法高亮代码展示
+  diff-panel.tsx        # 原始代码与 AI 注释代码 Diff 对比
   log-panel.tsx         # 工作日志与 Token 统计
-  top-action-bar.tsx    # 全局操作栏
-  model-config-dialog.tsx # 模型配置弹窗
-  history-popover.tsx   # 历史记录面板
+  top-action-bar.tsx    # 全局操作栏（保存、历史、配置、重新生成）
+  model-config-dialog.tsx # 模型配置弹窗（含流式开关）
+  history-popover.tsx   # 历史记录面板（支持搜索）
+  onboarding-tour.tsx   # 首次访问引导
+  zen-mode-toggle.tsx   # 专注模式切换按钮
+  error-boundary.tsx    # React 错误边界
   logo.tsx              # 品牌 Logo
 lib/
-  ai-client.ts          # 统一 AI 调用层（多模型分发，含 Token 提取）
+  ai-client.ts          # 统一 AI 调用层（多模型分发、超时控制、中间件钩子）
   ai-config.ts          # 模型配置定义与持久化
   server-storage.ts     # 服务端存储 API 调用封装
-  context.tsx           # 全局状态管理
+  context.tsx           # 全局状态管理（含专注模式、重新生成）
   prompt-template.ts    # 系统提示词
+  stream-parser.ts      # 流式 JSON 提取与容错解析
+  validation.ts         # Zod 运行时 Schema 校验
   types.ts              # TypeScript 类型定义
   storage.ts            # 历史记录存储（localStorage + API 双写）
+  __tests__/            # Vitest 单元测试
 ```
+
+## 测试
+
+项目使用 Vitest 进行单元测试，覆盖核心解析、校验与存储逻辑：
+
+```bash
+npm run test
+```
+
+当前测试覆盖：
+- `stream-parser.test.ts` — 流式 JSON 提取与容错解析（9 例）
+- `validation.test.ts` — Zod Schema 校验与字段修复（16 例）
+- `storage.test.ts` — 历史记录存储与标题生成（7 例）
+- `crypto.test.ts` — API Key 加密解密（5 例）
+- `summary.test.ts` — 代码统计计算（5 例）
+
+**共计 42 个测试用例全部通过。**
 
 ## 备注
 
 - 本项目 AI API 调用均发生在浏览器端。API Key 可选择保存在浏览器 localStorage 中（开发模式），或随 Docker 数据卷持久化到服务器（Docker 部署模式）。
 - 使用公有云模型时，请遵守对应平台的每日请求配额与使用条款。
+- 详见 [`设计文档.md`](./设计文档.md) 了解完整的设计思路、技术架构与非功能性设计考量。

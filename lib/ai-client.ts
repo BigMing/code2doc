@@ -14,6 +14,35 @@ import { parseSseStream } from './sse-parser';
 // 公共工具
 // ============================================================
 
+const DEFAULT_TIMEOUT = 120000; // 120 秒默认超时
+
+/**
+ * [新增] 带超时的 fetch 封装
+ */
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit & { timeout?: number }
+): Promise<Response> {
+  const { timeout = DEFAULT_TIMEOUT, ...rest } = init || {};
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const res = await fetch(input, {
+      ...rest,
+      signal: controller.signal,
+    });
+    return res;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error(`请求超时：模型在 ${timeout / 1000} 秒内未响应，请检查网络或稍后重试。`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 function buildMessages(prompt: string): { role: string; content: string }[] {
   return [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -21,18 +50,84 @@ function buildMessages(prompt: string): { role: string; content: string }[] {
   ];
 }
 
+/**
+ * [优化] 更友好的 API 错误提示，包含下一步操作建议
+ */
 function handleApiError(error: any, provider: string): never {
   const msg = error?.message || String(error);
-  if (msg.includes('429') || msg.includes('rate limit')) {
-    throw new Error('额度超限：请求频率过高或今日额度已达上限，请稍后重试。');
+  if (msg.includes('timeout') || msg.includes('超时')) {
+    throw new Error(`⏱ 请求超时：${provider} 响应过慢。建议：检查网络连接，或切换到响应更快的模型。`);
   }
-  if (msg.includes('401') || msg.includes('403') || msg.includes('Invalid')) {
-    throw new Error(`API Key 无效或权限不足，请检查 ${provider} 的密钥配置。`);
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('Too Many')) {
+    throw new Error(`🚫 额度超限：${provider} 请求频率过高或今日额度已达上限。建议：等待 1 分钟后重试，或切换到其他模型。`);
   }
-  if (msg.includes('500') || msg.includes('502') || msg.includes('503')) {
-    throw new Error(`${provider} 服务端暂时不可用，请稍后重试。`);
+  if (msg.includes('401') || msg.includes('403') || msg.includes('Invalid') || msg.includes('unauthorized')) {
+    throw new Error(`🔑 API Key 无效：请检查「模型配置」中 ${provider} 的密钥是否正确填写。`);
   }
-  throw new Error(msg || `${provider} 模型返回格式异常或服务不可用，请重试`);
+  if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504')) {
+    throw new Error(`🔧 ${provider} 服务端暂时不可用（${msg}）。建议：稍后重试，或切换到备用模型。`);
+  }
+  if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
+    throw new Error(`🌐 网络错误：无法连接到 ${provider}。建议：检查网络代理设置，或确认自定义 API 地址是否正确。`);
+  }
+  throw new Error(`❌ ${provider} 调用失败：${msg || '模型返回格式异常或服务不可用'}。建议：尝试重新生成。`);
+}
+
+// ============================================================
+// [新增] 中间件系统
+// ============================================================
+
+export interface AiMiddleware {
+  name: string;
+  beforeRequest?: (params: { provider: string; model: string; codeLength: number }) => void | Promise<void>;
+  afterResponse?: (result: AnalysisResult, usage?: TokenUsage) => void | Promise<void>;
+  onError?: (error: Error) => void | Promise<void>;
+}
+
+const _middlewares: AiMiddleware[] = [];
+
+export function registerMiddleware(mw: AiMiddleware) {
+  _middlewares.push(mw);
+}
+
+export function unregisterMiddleware(name: string) {
+  const idx = _middlewares.findIndex(m => m.name === name);
+  if (idx !== -1) _middlewares.splice(idx, 1);
+}
+
+async function runBeforeRequest(provider: string, model: string, codeLength: number) {
+  for (const mw of _middlewares) {
+    if (mw.beforeRequest) {
+      try { await mw.beforeRequest({ provider, model, codeLength }); } catch { /* ignore middleware error */ }
+    }
+  }
+}
+
+async function runAfterResponse(result: AnalysisResult, usage?: TokenUsage) {
+  for (const mw of _middlewares) {
+    if (mw.afterResponse) {
+      try { await mw.afterResponse(result, usage); } catch { /* ignore middleware error */ }
+    }
+  }
+}
+
+async function runOnError(error: Error) {
+  for (const mw of _middlewares) {
+    if (mw.onError) {
+      try { await mw.onError(error); } catch { /* ignore middleware error */ }
+    }
+  }
+}
+
+// [新增] 流式开关：用户可在模型配置中关闭流式输出
+let _globalEnableStreaming = true;
+
+export function setGlobalEnableStreaming(enabled: boolean) {
+  _globalEnableStreaming = enabled;
+}
+
+export function getGlobalEnableStreaming(): boolean {
+  return _globalEnableStreaming;
 }
 
 // ============================================================
@@ -172,7 +267,7 @@ class OpenAiCompatibleClient {
       body.response_format = { type: 'json_object' };
     }
 
-    const res = await fetch(`${this.cfg.baseUrl}/chat/completions`, {
+    const res = await fetchWithTimeout(`${this.cfg.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -283,7 +378,7 @@ class AnthropicClient {
       stream,
     };
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -445,7 +540,38 @@ export async function* streamAnalyzeCode(
   config: AnalysisConfig,
   abortController?: AbortController
 ) {
-  yield* getClient().streamAnalyzeCode(code, config, abortController);
+  const client = getClient();
+  const cfg = _globalModelConfig!;
+  await runBeforeRequest(cfg.provider, cfg.model, code.length);
+
+  try {
+    if (!_globalEnableStreaming) {
+      // [新增] 流式已关闭，使用非流式接口并模拟流式输出
+      const result = await client.analyzeCode(code, config);
+      await runAfterResponse(result);
+      yield { chunk: JSON.stringify(result), accumulated: JSON.stringify(result), usage: undefined as TokenUsage | undefined };
+      return;
+    }
+
+    let lastUsage: TokenUsage | undefined;
+    let accumulated = '';
+    for await (const item of client.streamAnalyzeCode(code, config, abortController)) {
+      accumulated = item.accumulated;
+      if (item.usage) lastUsage = item.usage;
+      yield item;
+    }
+
+    // 流结束后解析结果并触发中间件
+    try {
+      const result = extractJsonFromStream(accumulated);
+      await runAfterResponse(result, lastUsage);
+    } catch {
+      // 流式输出可能不完整，不在这里抛错，由调用方处理
+    }
+  } catch (error: any) {
+    await runOnError(error);
+    handleApiError(error, cfg.provider);
+  }
 }
 
 export async function analyzeCode(
@@ -453,5 +579,16 @@ export async function analyzeCode(
   config: AnalysisConfig,
   updateRawInfo?: (req: any, res: any) => void
 ): Promise<AnalysisResult> {
-  return getClient().analyzeCode(code, config, updateRawInfo);
+  const client = getClient();
+  const cfg = _globalModelConfig!;
+  await runBeforeRequest(cfg.provider, cfg.model, code.length);
+
+  try {
+    const result = await client.analyzeCode(code, config, updateRawInfo);
+    await runAfterResponse(result);
+    return result;
+  } catch (error: any) {
+    await runOnError(error);
+    handleApiError(error, cfg.provider);
+  }
 }

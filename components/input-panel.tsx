@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from '@/lib/context';
-import { streamAnalyzeCode, detectLanguage } from '@/lib/ai-client';
+import { streamAnalyzeCode, detectLanguage, getGlobalEnableStreaming } from '@/lib/ai-client';
 import { calculateSummary } from '@/lib/summary';
 import { getProviderLabel } from '@/lib/ai-config';
 import { extractJsonFromStream } from '@/lib/stream-parser';
@@ -20,9 +20,18 @@ import {
   Upload,
   Lightbulb,
   X,
-  Keyboard
+  Keyboard,
+  Zap,
+  ZapOff,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import CodeMirror from '@uiw/react-codemirror';
+import { oneDark } from '@codemirror/theme-one-dark';
+import { javascript } from '@codemirror/lang-javascript';
+import { java } from '@codemirror/lang-java';
+import { python } from '@codemirror/lang-python';
+import { markdown } from '@codemirror/lang-markdown';
 
 const LANGUAGES = [
   { value: 'auto', label: '自动识别 (AI)' },
@@ -58,7 +67,18 @@ export function InputPanel() {
   const [isDetecting, setIsDetecting] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [genStep, setGenStep] = useState<'idle' | 'connecting' | 'analyzing' | 'parsing' | 'rendering'>('idle');
+
+  // [新增] CodeMirror 语言扩展映射
+  const getLanguageExtension = useCallback(() => {
+    switch (config.language) {
+      case 'java': return java();
+      case 'javascript':
+      case 'typescript': return javascript({ jsx: true, typescript: config.language === 'typescript' });
+      case 'python': return python();
+      default: return markdown();
+    }
+  }, [config.language]);
 
   const EXT_TO_LANGUAGE: Record<string, string> = {
     '.java': 'java', '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
@@ -151,9 +171,6 @@ export function InputPanel() {
       businessBackground: DEMO_BUSINESS_CONTEXT,
     });
     addLog('已加载示例代码（电商订单服务），可按 Ctrl+Enter 直接生成', 'info');
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 100);
   };
 
   // [优化] 取消生成
@@ -200,10 +217,11 @@ export function InputPanel() {
 
     setError(null);
     streamStart();
-    addLog(`开始流式分析代码，目标语言：${finalLanguage}`, 'info');
+    setGenStep('connecting');
+    addLog(`开始分析代码，目标语言：${finalLanguage}`, 'info');
 
     try {
-      addLog(`正在建立与 ${getProviderLabel(modelConfig.provider)} 的流式连接...`, 'info');
+      addLog(`正在建立与 ${getProviderLabel(modelConfig.provider)}  的连接...`, 'info');
       
       const startTime = Date.now();
       const stream = streamAnalyzeCode(
@@ -218,8 +236,9 @@ export function InputPanel() {
 
       for await (const { chunk, accumulated, usage } of stream) {
         if (isFirstChunk) {
-          addLog('连接已建立，开始接收数据流', 'success');
+          addLog('连接已建立，开始接收数据', 'success');
           isFirstChunk = false;
+          setGenStep('analyzing');
         }
         fullText = accumulated;
         streamChunk(chunk, accumulated);
@@ -242,6 +261,7 @@ export function InputPanel() {
         addLog(`数据接收完成，共 ${fullText.length.toLocaleString()} 字符，耗时 ${elapsed} 秒`, 'success');
       }
       
+      setGenStep('parsing');
       addLog('正在解析 JSON 结构...', 'info');
       try {
         const parsedResult = extractJsonFromStream(fullText);
@@ -251,6 +271,7 @@ export function InputPanel() {
         setParseSummary(summary);
         
         addLog(`解析完成，识别到 ${summary.methodCount} 个方法、${summary.detectedRules} 条业务规则，开始渲染`, 'success');
+        setGenStep('rendering');
         addLog('正在动态渲染需求文档与代码...', 'info');
         
         streamEnd(parsedResult);
@@ -273,6 +294,7 @@ export function InputPanel() {
       }
     } finally {
       setIsAnalyzing(false);
+      setGenStep('idle');
       abortControllerRef.current = null;
     }
   };
@@ -329,18 +351,25 @@ export function InputPanel() {
           </button>
         </div>
 
-        {/* 代码编辑器 */}
-        <div className="relative group">
-          <textarea
-            ref={textareaRef}
+        {/* [优化] 代码编辑器：升级为 CodeMirror 语法高亮 */}
+        <div className="relative group border border-slate-200 dark:border-slate-600 rounded overflow-hidden">
+          <CodeMirror
             value={rawCode}
-            onChange={(e) => setRawCode(e.target.value)}
-            placeholder="// 请在此粘贴业务功能源代码...&#10;// 快捷键：Ctrl+Enter 生成，Ctrl+K 加载示例"
-            className="w-full h-56 p-4 font-mono text-xs border border-slate-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none resize-none bg-white dark:bg-slate-800 transition-shadow text-slate-600 dark:text-slate-300 leading-relaxed"
-            spellCheck={false}
+            height="224px"
+            theme={typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? oneDark : 'light'}
+            extensions={[getLanguageExtension()]}
+            onChange={(value) => setRawCode(value)}
+            placeholder="// 请在此粘贴业务功能源代码..."
+            className="text-xs font-mono"
+            basicSetup={{
+              lineNumbers: true,
+              highlightActiveLineGutter: true,
+              highlightActiveLine: true,
+              foldGutter: false,
+            }}
           />
           {rawCode.length > 0 && (
-            <div className="absolute bottom-2 right-2 text-[9px] font-mono text-slate-300 dark:text-slate-600 pointer-events-none">
+            <div className="absolute bottom-1 right-2 text-[9px] font-mono text-slate-300 dark:text-slate-600 pointer-events-none z-10">
               {rawCode.length.toLocaleString()} chars
             </div>
           )}
@@ -415,7 +444,43 @@ export function InputPanel() {
       </div>
 
       {/* 底部按钮 */}
-      <div className="p-3 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+      <div className="p-3 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 space-y-2">
+        {/* [新增] 生成进度指示器 */}
+        {isAnalyzing && genStep !== 'idle' && (
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+            <div className="flex-1 flex items-center gap-1.5">
+              {[
+                { key: 'connecting', label: '连接' },
+                { key: 'analyzing', label: '分析' },
+                { key: 'parsing', label: '解析' },
+                { key: 'rendering', label: '渲染' },
+              ].map((step, idx, arr) => {
+                const isActive = genStep === (step.key as typeof genStep);
+                const isDone = arr.findIndex(s => s.key === genStep) > idx;
+                return (
+                  <React.Fragment key={step.key}>
+                    <div className={`flex items-center gap-1 text-[10px] font-bold transition-colors ${
+                      isActive ? 'text-blue-600 dark:text-blue-400' : isDone ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'
+                    }`}>
+                      {isDone ? (
+                        <span className="w-3.5 h-3.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[8px]">✓</span>
+                      ) : isActive ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <span className="w-3.5 h-3.5 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-[8px]">{idx + 1}</span>
+                      )}
+                      {step.label}
+                    </div>
+                    {idx < arr.length - 1 && (
+                      <span className="text-slate-200 dark:text-slate-700">→</span>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2">
           {isAnalyzing ? (
             <>
@@ -434,6 +499,7 @@ export function InputPanel() {
           ) : (
             <button
               onClick={handleGenerate}
+              title="快捷键：Ctrl+Enter"
               className="flex-1 py-2.5 rounded font-bold text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-2 transition-all bg-[#3B82F6] text-white hover:bg-blue-600 shadow-sm active:scale-[0.98]"
             >
               <Wand2 className="w-3.5 h-3.5" />
@@ -441,9 +507,20 @@ export function InputPanel() {
             </button>
           )}
         </div>
-        <div className="mt-2 flex items-center justify-center gap-1 text-[9px] text-slate-300 dark:text-slate-600">
-          <Keyboard className="w-2.5 h-2.5" />
-          <span>Ctrl+Enter 生成 · Ctrl+K 示例</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 text-[9px] text-slate-300 dark:text-slate-600">
+            <Keyboard className="w-2.5 h-2.5" />
+            <span>Ctrl+Enter 生成 · Ctrl+K 示例</span>
+          </div>
+          {/* [新增] 流式开关状态 */}
+          <div className="flex items-center gap-1 text-[9px] text-slate-300 dark:text-slate-600">
+            {getGlobalEnableStreaming() ? (
+              <Zap className="w-2.5 h-2.5 text-amber-400" />
+            ) : (
+              <ZapOff className="w-2.5 h-2.5 text-slate-400" />
+            )}
+            <span>{getGlobalEnableStreaming() ? '流式输出已开启' : '流式输出已关闭'}</span>
+          </div>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@
  */
 
 import { AnalysisResult } from "./types";
+import { validateAndRepairAnalysisResult } from "./validation";
 
 /**
  * 从任意文本中提取有效的 JSON 对象
@@ -21,7 +22,8 @@ export function extractJsonFromStream(text: string): AnalysisResult {
 
   // 2. 尝试直接解析清理后的文本
   try {
-    return JSON.parse(cleaned) as AnalysisResult;
+    const parsed = JSON.parse(cleaned);
+    return validateAndRepairAnalysisResult(parsed);
   } catch {
     // ignore
   }
@@ -39,7 +41,8 @@ export function extractJsonFromStream(text: string): AnalysisResult {
       if (depth === 0 && start !== -1) {
         const candidate = cleaned.slice(start, i + 1);
         try {
-          return JSON.parse(candidate) as AnalysisResult;
+          const parsed = JSON.parse(candidate);
+          return validateAndRepairAnalysisResult(parsed);
         } catch {
           // 继续搜索下一个可能的块
           start = -1;
@@ -52,9 +55,10 @@ export function extractJsonFromStream(text: string): AnalysisResult {
   const match = cleaned.match(/\{[\s\S]*\}/);
   if (match) {
     try {
-      return JSON.parse(match[0]) as AnalysisResult;
+      const parsed = JSON.parse(match[0]);
+      return validateAndRepairAnalysisResult(parsed);
     } catch {
-      throw new Error("模型返回的 JSON 结构损坏，无法解析。");
+      throw new Error("模型返回的 JSON 结构损坏，无法解析。请尝试重新生成，或换一个模型再试。");
     }
   }
   

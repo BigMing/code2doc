@@ -8,7 +8,7 @@ WORKDIR /app
 
 # 安装依赖
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
 # 复制源码并构建
 COPY . .

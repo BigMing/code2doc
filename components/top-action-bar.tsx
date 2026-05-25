@@ -9,7 +9,9 @@ import {
   Save, 
   RotateCw, 
   Database,
-  Forward
+  Forward,
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -22,7 +24,8 @@ export function TopActionBar() {
   const { 
     result, rawCode, config, isAnalyzing, 
     addLog, clearRawData,
-    showSkipButton, skipAnimation
+    showSkipButton, skipAnimation,
+    regenerateAnalysis
   } = useAppContext();
 
   const handleSave = async () => {
@@ -101,11 +104,22 @@ export function TopActionBar() {
         <Button 
           variant="ghost" 
           size="sm" 
+          disabled={!result || isAnalyzing}
+          className="h-8 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 gap-1.5 disabled:opacity-40"
+          onClick={regenerateAnalysis}
+          title="保留代码和配置，清空结果重新生成"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          重新生成
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="sm" 
           className="h-8 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 gap-1.5"
           onClick={() => window.location.reload()}
         >
           <RotateCw className="w-3.5 h-3.5" />
-          重新分析
+          重置页面
         </Button>
       </div>
     </div>
