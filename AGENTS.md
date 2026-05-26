@@ -235,10 +235,28 @@ DATA_DIR=/app/data
 
 ## 测试说明
 
-本项目**当前未配置任何测试框架**，也没有测试文件。若需添加测试，建议：
-- 单元测试：选择 `vitest` 测试 `lib/` 下的纯函数（如 `stream-parser.ts`, `summary.ts`, `storage.ts`, `ai-config.ts`）
-- 组件测试：使用 `@testing-library/react`
+本项目使用 **Vitest** 作为单元测试框架，测试覆盖 `lib/` 目录下的核心纯函数逻辑：
+
+| 测试文件 | 被测模块 | 用例数 | 说明 |
+|---------|---------|--------|------|
+| `lib/__tests__/stream-parser.test.ts` | `stream-parser.ts` | 9 | 流式 JSON 四层提取策略、嵌套大括号、异常文本容错 |
+| `lib/__tests__/validation.test.ts` | `validation.ts` | 16 | Zod Schema 校验、字段映射修复（中英文别名）、模型配置校验 |
+| `lib/__tests__/storage.test.ts` | `storage.ts` | 7 | localStorage 读写、10 条上限截断、记录删除、标题自动生成 |
+| `lib/__tests__/summary.test.ts` | `summary.ts` | 5 | 代码统计计算（方法数/类数/章节数/规则数/代码行数） |
+| `lib/__tests__/crypto.test.ts` | `crypto.ts` | 5 | AES 加解密、特殊字符兼容、旧版明文降级 |
+| **合计** | — | **42** | — |
+
+执行测试：
+```bash
+npm test
+# 或
+npx vitest run
+```
+
+**当前未覆盖的模块**（建议后续补充）：
+- 组件测试：使用 `@testing-library/react` 测试 UI 组件交互
 - E2E 测试：使用 `playwright` 测试核心用户流（粘贴代码 → 生成 → 导出）
+- AI 客户端集成测试：`ai-client.ts` 依赖外部 API，建议通过 Mock fetch 或 MSW 进行测试
 
 ---
 
