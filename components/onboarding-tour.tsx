@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { X, ChevronRight, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { apiSave, apiLoad } from '@/lib/server-storage';
 
 const STORAGE_KEY = 'CODE2DOC_ONBOARDING_V1';
 
@@ -116,20 +117,48 @@ export function OnboardingTour() {
   const [currentStep, setCurrentStep] = useState(0);
   const [rect, setRect] = useState<DOMRectLike>({ x: 0, y: 0, width: 0, height: 0 });
   const [winSize, setWinSize] = useState({ w: 0, h: 0 });
+  const [checked, setChecked] = useState(false);
   const maskId = useRef(`tour-mask-${Math.random().toString(36).slice(2, 9)}`).current;
 
-  // 检测是否已看过引导
+  // 检测是否已看过引导（优先 localStorage，回退服务端存储）
   useEffect(() => {
-    try {
-      const done = localStorage.getItem(STORAGE_KEY);
-      if (done !== 'true') {
-        // 延迟一点弹出，等待布局稳定
-        const timer = setTimeout(() => setVisible(true), 800);
-        return () => clearTimeout(timer);
+    let cancelled = false;
+    async function check() {
+      let done = false;
+      try {
+        done = localStorage.getItem(STORAGE_KEY) === 'true';
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
+      if (!done) {
+        try {
+          const remote = await apiLoad(STORAGE_KEY);
+          if (remote === true) {
+            done = true;
+            // 同步回 localStorage，减少后续网络请求
+            try {
+              localStorage.setItem(STORAGE_KEY, 'true');
+            } catch {
+              // ignore
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (!cancelled) {
+        setChecked(true);
+        if (!done) {
+          // 延迟一点弹出，等待布局稳定
+          const timer = setTimeout(() => setVisible(true), 800);
+          return () => clearTimeout(timer);
+        }
+      }
     }
+    check();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // 计算高亮区域
@@ -179,6 +208,12 @@ export function OnboardingTour() {
     setVisible(false);
     try {
       localStorage.setItem(STORAGE_KEY, 'true');
+    } catch {
+      // ignore
+    }
+    // 同时持久化到服务端，实现跨浏览器/无痕模式兼容
+    try {
+      apiSave(STORAGE_KEY, true).catch(() => {});
     } catch {
       // ignore
     }
